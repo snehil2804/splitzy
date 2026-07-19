@@ -1,7 +1,10 @@
 import { expenseEmoji } from "./emoji";
 import { getSupabase } from "./supabase";
 import type {
+  ActivityEntry,
+  ActivityLogRow,
   AddExpenseInput,
+  EditExpenseInput,
   Expense,
   ExpenseRow,
   Invitation,
@@ -11,6 +14,8 @@ import type {
   MyInvitation,
   Profile,
   ProfileRow,
+  SettlementRecord,
+  SettlementRow,
   TripData,
   TripMemberRow,
   TripRow,
@@ -54,6 +59,22 @@ function mapExpense(row: ExpenseRow): Expense {
     participantIds,
     locationName: row.location_name,
     date: new Date(row.paid_at ?? row.created_at),
+    createdBy: row.created_by,
+    splitType: row.split_type,
+    category: row.category,
+    notes: row.notes,
+    currency: row.currency,
+  };
+}
+
+function mapSettlement(row: SettlementRow): SettlementRecord {
+  return {
+    id: row.id,
+    fromMemberId: row.from_member_id,
+    toMemberId: row.to_member_id,
+    amount: row.amount,
+    note: row.note,
+    createdAt: new Date(row.created_at),
   };
 }
 
@@ -76,21 +97,39 @@ export async function fetchTripData(
   const userId = sessionData.session?.user.id ?? null;
 
   const tripRows = tripsRes.data as TripRow[];
-  const trips = tripRows.map((t) => ({ id: t.id, name: t.name, status: t.status }));
+  const trips = tripRows.map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    status: t.status,
+  }));
 
   const tripRow =
     tripRows.find((t) => t.id === selectedTripId) ??
     tripRows.find((t) => t.status === TRIP_ACTIVE_STATUS) ??
     tripRows[0];
   const trip = tripRow
-    ? { id: tripRow.id, name: tripRow.name, status: tripRow.status }
+    ? {
+        id: tripRow.id,
+        name: tripRow.name,
+        description: tripRow.description,
+        status: tripRow.status,
+      }
     : null;
 
   if (!trip) {
-    return { trips, trip: null, members: [], myMemberId: null, myRole: null, expenses: [] };
+    return {
+      trips,
+      trip: null,
+      members: [],
+      myMemberId: null,
+      myRole: null,
+      expenses: [],
+      settlements: [],
+    };
   }
 
-  const [membersRes, expensesRes] = await Promise.all([
+  const [membersRes, expensesRes, settlementsRes] = await Promise.all([
     supabase
       .from("trip_members")
       .select("*, members(*)")
@@ -102,8 +141,13 @@ export async function fetchTripData(
       .eq("trip_id", trip.id)
       .is("deleted_at", null)
       .order("paid_at", { ascending: false }),
+    supabase
+      .from("settlements")
+      .select("*")
+      .eq("trip_id", trip.id)
+      .order("created_at", { ascending: false }),
   ]);
-  const firstError = membersRes.error ?? expensesRes.error;
+  const firstError = membersRes.error ?? expensesRes.error ?? settlementsRes.error;
   if (firstError) throw new Error(firstError.message);
 
   const members: Member[] = (membersRes.data as TripMemberRow[])
@@ -119,6 +163,7 @@ export async function fetchTripData(
   const mine = userId ? members.find((m) => m.userId === userId) : undefined;
 
   const expenses = (expensesRes.data as ExpenseRow[]).map(mapExpense);
+  const settlements = (settlementsRes.data as SettlementRow[]).map(mapSettlement);
 
   return {
     trips,
@@ -127,6 +172,7 @@ export async function fetchTripData(
     myMemberId: mine?.id ?? null,
     myRole: mine?.role ?? null,
     expenses,
+    settlements,
   };
 }
 
@@ -167,9 +213,37 @@ export async function addExpense(input: AddExpenseInput): Promise<string> {
     p_payment_app: input.paymentApp,
     p_paid_at: input.paidAt.toISOString(),
     p_location_name: input.locationName,
+    p_split_type: input.splitType,
+    p_splits: input.splits?.map((s) => ({ member_id: s.memberId, value: s.value })) ?? null,
+    p_category: input.category,
+    p_notes: input.notes,
   });
   if (error) throw new Error(error.message);
   return data as string;
+}
+
+/**
+ * Edits an expense via the `edit_expense()` RPC — creator or trip owner
+ * only (enforced server-side); replaces the participant split wholesale
+ * using the same split math as `add_expense()`.
+ */
+export async function editExpense(input: EditExpenseInput): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc("edit_expense", {
+    p_expense_id: input.expenseId,
+    p_description: input.description,
+    p_amount: input.amount,
+    p_paid_by: input.paidById,
+    p_participant_ids: input.participantIds,
+    p_paid_at: input.paidAt?.toISOString() ?? null,
+    p_payment_app: input.paymentApp,
+    p_location_name: input.locationName,
+    p_split_type: input.splitType,
+    p_splits: input.splits?.map((s) => ({ member_id: s.memberId, value: s.value })) ?? null,
+    p_category: input.category,
+    p_notes: input.notes,
+  });
+  if (error) throw new Error(error.message);
 }
 
 // ── Trip management ──────────────────────────────────────────────────────────
@@ -188,6 +262,48 @@ export async function renameTrip(tripId: string, name: string): Promise<void> {
     .from("trips")
     .update({ name })
     .eq("id", tripId);
+  if (error) throw new Error(error.message);
+}
+
+/** Owner-only via RLS; same column grant as renameTrip (name/description). */
+export async function updateTripDescription(
+  tripId: string,
+  description: string,
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from("trips")
+    .update({ description: description.trim() || null })
+    .eq("id", tripId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Permanently deletes a trip and everything under it — owner only,
+ * enforced and executed atomically inside the RPC. Irreversible.
+ */
+export async function deleteTrip(tripId: string): Promise<void> {
+  const { error } = await getSupabase().rpc("delete_trip", { p_trip_id: tripId });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Deactivates the caller's own membership. Refused for a sole owner (must
+ * transfer ownership first) — enforced server-side.
+ */
+export async function leaveTrip(tripId: string): Promise<void> {
+  const { error } = await getSupabase().rpc("leave_trip", { p_trip_id: tripId });
+  if (error) throw new Error(error.message);
+}
+
+/** Owner-only: makes `newOwnerMemberId` the owner, demotes the caller. */
+export async function transferTripOwnership(
+  tripId: string,
+  newOwnerMemberId: string,
+): Promise<void> {
+  const { error } = await getSupabase().rpc("transfer_trip_ownership", {
+    p_trip_id: tripId,
+    p_new_owner_member_id: newOwnerMemberId,
+  });
   if (error) throw new Error(error.message);
 }
 
@@ -400,4 +516,53 @@ export async function updateDisplayName(displayName: string): Promise<void> {
     .update({ display_name: displayName })
     .eq("id", userId);
   if (error) throw new Error(error.message);
+}
+
+// ── Settlements ──────────────────────────────────────────────────────────────
+
+/**
+ * Records a settlement (e.g. "Shruti paid Snehil ₹300") via the
+ * `record_settlement()` RPC. Balances reflect it immediately on the next
+ * `fetchTripData()` — `computeBalances()` treats it as a real cash
+ * adjustment, not a new expense.
+ */
+export async function recordSettlement(
+  tripId: string,
+  fromMemberId: string,
+  toMemberId: string,
+  amount: number,
+  note?: string | null,
+): Promise<string> {
+  const { data, error } = await getSupabase().rpc("record_settlement", {
+    p_trip_id: tripId,
+    p_from_member_id: fromMemberId,
+    p_to_member_id: toMemberId,
+    p_amount: amount,
+    p_note: note ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+// ── Activity ─────────────────────────────────────────────────────────────────
+
+/**
+ * The trip's immutable activity feed — written only by database triggers
+ * (see migration `trip_expense_engine`), never inserted from the client.
+ */
+export async function fetchActivity(tripId: string): Promise<ActivityEntry[]> {
+  const { data, error } = await getSupabase()
+    .from("activity_log")
+    .select("*")
+    .eq("trip_id", tripId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw new Error(error.message);
+  return (data as ActivityLogRow[]).map((row) => ({
+    id: row.id,
+    actorMemberId: row.actor_member_id,
+    action: row.action,
+    description: row.description,
+    createdAt: new Date(row.created_at),
+  }));
 }

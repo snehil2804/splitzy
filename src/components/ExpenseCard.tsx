@@ -3,12 +3,14 @@
 import { formatINR, formatTime } from "@/lib/format";
 import type { Expense, Member } from "@/lib/types";
 import { AvatarStack } from "./Avatar";
-import { MapPinIcon, TrashIcon } from "./icons";
+import { MapPinIcon, PencilIcon, TrashIcon } from "./icons";
 
 interface ExpenseCardProps {
   expense: Expense;
   membersById: Map<string, Member>;
   onDelete?: (expense: Expense) => void;
+  /** Only rendered when the signed-in member may edit this expense (creator or trip owner). */
+  onEdit?: (expense: Expense) => void;
   /** Compact rows for the dashboard's recent list. */
   compact?: boolean;
   /** Stagger index for the entrance animation. */
@@ -19,6 +21,7 @@ export function ExpenseCard({
   expense,
   membersById,
   onDelete,
+  onEdit,
   compact = false,
   index = 0,
 }: ExpenseCardProps) {
@@ -63,14 +66,27 @@ export function ExpenseCard({
         <span className="text-[15px] font-semibold tabular-nums">
           {formatINR(expense.amount)}
         </span>
-        {onDelete && (
-          <button
-            onClick={() => onDelete(expense)}
-            aria-label={`Delete ${expense.description}`}
-            className="tap -m-1 rounded-full p-1.5 text-ink-faint transition-colors hover:text-negative"
-          >
-            <TrashIcon className="size-4" />
-          </button>
+        {(onEdit || onDelete) && (
+          <div className="flex items-center gap-1">
+            {onEdit && (
+              <button
+                onClick={() => onEdit(expense)}
+                aria-label={`Edit ${expense.description}`}
+                className="tap -m-1 rounded-full p-1.5 text-ink-faint transition-colors hover:text-brand"
+              >
+                <PencilIcon className="size-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => onDelete(expense)}
+                aria-label={`Delete ${expense.description}`}
+                className="tap -m-1 rounded-full p-1.5 text-ink-faint transition-colors hover:text-negative"
+              >
+                <TrashIcon className="size-4" />
+              </button>
+            )}
+          </div>
         )}
       </div>
     </article>

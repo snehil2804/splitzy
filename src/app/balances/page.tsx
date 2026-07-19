@@ -1,24 +1,48 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { SettlementList } from "@/components/SettlementList";
 import { CardSkeleton } from "@/components/Skeleton";
 import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
 import { useTripData } from "@/hooks/useTripData";
-import { computeBalances, computeSettlements } from "@/lib/balances";
+import { computeBalances, computeSettlements, totalYouAreOwed, totalYouOwe } from "@/lib/balances";
 import { formatINR } from "@/lib/format";
+import { recordSettlement } from "@/lib/queries";
+import type { Settlement } from "@/lib/types";
 
 export default function BalancesPage() {
   const { status, data, error, refresh } = useTripData();
   const myName =
     data?.members.find((m) => m.id === data.myMemberId)?.name ?? null;
 
+  const [settlingKey, setSettlingKey] = useState<string | null>(null);
+  const [settleError, setSettleError] = useState<string | null>(null);
+
   const derived = useMemo(() => {
     if (!data) return null;
-    const balances = computeBalances(data.members, data.expenses);
+    const balances = computeBalances(data.members, data.expenses, data.settlements);
     return { balances, settlements: computeSettlements(balances) };
   }, [data]);
+
+  const myBalance = derived?.balances.find((b) => b.member.id === data?.myMemberId) ?? null;
+  const youOwe = derived ? totalYouOwe(derived.settlements, data?.myMemberId ?? "") : 0;
+  const youAreOwed = derived ? totalYouAreOwed(derived.settlements, data?.myMemberId ?? "") : 0;
+
+  async function handleSettle(s: Settlement) {
+    if (!data?.trip) return;
+    const key = `${s.from.id}-${s.to.id}`;
+    setSettlingKey(key);
+    setSettleError(null);
+    try {
+      await recordSettlement(data.trip.id, s.from.id, s.to.id, s.amount);
+      await refresh();
+    } catch (err) {
+      setSettleError(err instanceof Error ? err.message : "Couldn't record that settlement.");
+    } finally {
+      setSettlingKey(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -52,6 +76,40 @@ export default function BalancesPage() {
             />
           ) : (
             <>
+              {myBalance && (
+                <section className="anim-fade-up grid grid-cols-3 gap-2.5">
+                  <div className="glass rounded-2xl p-3.5 text-center">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-faint">
+                      You owe
+                    </p>
+                    <p className="mt-1 text-base font-bold tabular-nums text-negative">
+                      {formatINR(youOwe)}
+                    </p>
+                  </div>
+                  <div className="glass rounded-2xl p-3.5 text-center">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-faint">
+                      You are owed
+                    </p>
+                    <p className="mt-1 text-base font-bold tabular-nums text-positive">
+                      {formatINR(youAreOwed)}
+                    </p>
+                  </div>
+                  <div className="glass rounded-2xl p-3.5 text-center">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-faint">
+                      Net balance
+                    </p>
+                    <p
+                      className={`mt-1 text-base font-bold tabular-nums ${
+                        myBalance.net >= 0 ? "text-positive" : "text-negative"
+                      }`}
+                    >
+                      {myBalance.net >= 0 ? "+" : "−"}
+                      {formatINR(Math.abs(myBalance.net))}
+                    </p>
+                  </div>
+                </section>
+              )}
+
               {/* Per-member breakdown */}
               <section className="space-y-3">
                 {derived.balances.map((balance, i) => {
@@ -123,7 +181,14 @@ export default function BalancesPage() {
                 <SettlementList
                   settlements={derived.settlements}
                   identity={myName}
+                  onSettle={handleSettle}
+                  settlingKey={settlingKey}
                 />
+                {settleError && (
+                  <p className="anim-fade-in mt-3 rounded-2xl bg-negative/10 p-3 text-center text-sm font-medium text-negative">
+                    {settleError}
+                  </p>
+                )}
               </section>
             </>
           )}
