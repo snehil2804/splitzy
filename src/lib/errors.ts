@@ -9,3 +9,15 @@
 export function isPermissionError(message: string): boolean {
   return /permission denied|row-level security|RLS/i.test(message);
 }
+
+/**
+ * True for genuine transport failures (offline, DNS, aborted request) —
+ * the only case where "check your connection" copy is honest. Browsers
+ * throw these as `TypeError: Failed to fetch` / `NetworkError…` /
+ * `Load failed` (Safari).
+ */
+export function isNetworkError(message: string): boolean {
+  return /failed to fetch|networkerror|load failed|network request failed/i.test(
+    message,
+  );
+}

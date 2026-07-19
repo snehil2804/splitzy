@@ -1,6 +1,16 @@
 # Changelog
 
-## [Unreleased] — Stage 2: authenticated multi-trip (branch `feature/auth-multi-trip`)
+## [Unreleased] — Stage 3: forensics + completion (branch `feature/auth-multi-trip`)
+
+- **Diagnosed the "Anshul / permission denied / network error" report**: the user was on production (`main`, pre-auth build), which broke by design when the RLS cutover removed anon access, and which greets from the legacy localStorage identity. The feature branch was already correct; production heals on merge.
+- Legacy `splitzy:identity` localStorage key now deleted on first load (pre-paint script) so the old picker value can never resurface.
+- Settings → About shows the deployed build hash (`NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA`) for deployment diagnosis.
+- Honest error copy: network-specific message only for real fetch failures; generic copy otherwise; raw DB error text shown in development only (logged to console in production).
+- Trips: archive/reactivate with confirmation sheet; remove-member confirmation sheet; owner role management ("Make owner"/"Make member") via new `set_trip_member_role` RPC (migration `20260719163000`, blocks demoting the last active owner); Add Expense shows a read-only notice for archived trips.
+- `ConfirmSheet` gained configurable busy/cancel labels.
+- Tests: `npm test` (tsx + node:test — balance math incl. ₹900 → +600/−300/−300, settlements, partial splits, error classification) and `npm run test:db` (17-check live e2e with self-cleaning sandbox); `npm run typecheck` script added.
+
+## [Stage 2] — authenticated multi-trip (branch `feature/auth-multi-trip`)
 
 ### Fixed — "Signups not allowed for otp" on the login page
 

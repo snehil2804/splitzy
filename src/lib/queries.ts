@@ -247,6 +247,23 @@ export async function setMemberActive(
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Owner-only role change; the RPC refuses to demote the last active owner
+ * (ownership transfer = promote the other person first).
+ */
+export async function setMemberRole(
+  tripId: string,
+  memberId: string,
+  role: "owner" | "member",
+): Promise<void> {
+  const { error } = await getSupabase().rpc("set_trip_member_role", {
+    p_trip_id: tripId,
+    p_member_id: memberId,
+    p_role: role,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function fetchInvitations(tripId: string): Promise<Invitation[]> {
   const { data, error } = await getSupabase()
     .from("invitations")

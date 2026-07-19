@@ -155,6 +155,19 @@ export default function AddExpensePage() {
     );
   }
 
+  if (data.trip.status !== "active") {
+    return (
+      <div className="space-y-6">
+        <Header />
+        <EmptyState
+          emoji="📦"
+          title="This trip is archived"
+          message="Archived trips are read-only. Reactivate it from the Trips page to add expenses."
+        />
+      </div>
+    );
+  }
+
   if (succeeded) {
     return (
       <div className="space-y-6">

@@ -13,6 +13,14 @@ import { setThemePreference, useTheme } from "@/hooks/useTheme";
 import { useTripData } from "@/hooks/useTripData";
 import type { ThemePreference } from "@/lib/constants";
 
+/**
+ * Deployed commit, inlined at build time. Vercel exposes this
+ * automatically (System Environment Variables); locally it's absent.
+ * Lets anyone confirm which build they're actually looking at.
+ */
+const BUILD_ID =
+  process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local dev";
+
 const THEME_OPTIONS: Array<{
   value: ThemePreference;
   label: string;
@@ -123,7 +131,9 @@ export default function SettingsPage() {
           expenses automatically right after you pay via UPI — no typing at
           all.
         </p>
-        <p className="mt-3 text-xs text-ink-faint">Splitzy v0.2 · Made with 💜</p>
+        <p className="mt-3 text-xs text-ink-faint">
+          Splitzy v0.2 · Build {BUILD_ID} · Made with 💜
+        </p>
       </section>
     </div>
   );

@@ -38,8 +38,11 @@ export const viewport: Viewport = {
 /**
  * Runs before paint: stamps `data-theme` from the stored preference (or the
  * system) and keeps following the system while no explicit choice is stored.
+ * Also deletes the legacy pre-auth "splitzy:identity" key — identity now
+ * comes from the signed-in account, and a stale value from the old
+ * "Who are you?" picker must never influence anything again.
  */
-const themeScript = `(function(){var k="splitzy:theme",m=matchMedia("(prefers-color-scheme: dark)"),d=document.documentElement,f=function(){var s=localStorage.getItem(k);d.dataset.theme=s==="light"||s==="dark"?s:m.matches?"dark":"light"};f();m.addEventListener("change",f)})()`;
+const themeScript = `(function(){try{localStorage.removeItem("splitzy:identity")}catch(e){}var k="splitzy:theme",m=matchMedia("(prefers-color-scheme: dark)"),d=document.documentElement,f=function(){var s=localStorage.getItem(k);d.dataset.theme=s==="light"||s==="dark"?s:m.matches?"dark":"light"};f();m.addEventListener("change",f)})()`;
 
 export default function RootLayout({
   children,

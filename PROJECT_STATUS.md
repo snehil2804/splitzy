@@ -1,6 +1,17 @@
 # Project Status
 
-_Last updated: 2026-07-19 (Stage 2 complete on `feature/auth-multi-trip` — not merged)_
+_Last updated: 2026-07-19 (Stage 3 complete on `feature/auth-multi-trip` — verified end-to-end, not merged)_
+
+## ⚠️ Important: production (`splitzy-delta.vercel.app`) is knowingly broken until merge
+
+Production still serves `main` (`aa7b59b`, the pre-auth build). The Stage 2 RLS cutover removed anonymous database access, so that old build now shows "permission denied for table members" — and it greets from the legacy `localStorage["splitzy:identity"]` value (hence "Good evening, Anshul" if Anshul was ever tapped in the old picker). **This is not a bug in the feature branch**; it resolves the moment `feature/auth-multi-trip` merges to `main`. Test only the newest Vercel Preview (requires being signed into Vercel) or localhost. The current branch also deletes the stale localStorage key on first load and shows the deployed build hash in Settings → About so it's always possible to confirm which build you're on.
+
+## ✅ Stage 3: identity/production forensics + product completion (2026-07-19)
+
+- Confirmed the "Anshul greeting + permission denied + network copy" report was entirely the old production build (200 with no login redirect, `/login` 404, "Who are you" present in served HTML). Database mapping was and is correct.
+- New: owner role management (`set_trip_member_role` RPC + Make owner/member UI, last-owner demotion blocked), archive/reactivate trip with confirmation sheets, remove-member confirmation sheet, archived-trip read-only guard on Add Expense, honest error copy (network vs generic; raw DB errors dev-only, logged in prod), stale-identity cleanup, build-hash indicator.
+- New test infrastructure: `npm test` (8 unit tests: balance math incl. the ₹900 → +600/−300/−300 expectation, settlements, error classification) and `npm run test:db` (17-check live end-to-end: Snehil identity/owner mapping, RLS isolation both directions, onboarding state, trip creation/switching, guest members, paise splits, cross-trip rejection, logout, anon lockout — self-cleaning test sandbox).
+- Full verification this pass: typecheck ✓, lint ✓, 8/8 unit ✓, 17/17 db-e2e ✓, build ✓ (15 routes), local route smoke ✓, secret-bundle grep ✓, baseline data re-verified byte-identical (1 trip / 3 members / 3 tm / 3 expenses / 9 eps / ₹900 / Snehil linked + owner).
 
 ## 🔐 Stage 2: authenticated multi-trip (complete on branch, not merged)
 

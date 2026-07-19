@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
+import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { CheckIcon, PlusIcon } from "@/components/icons";
 import { CardSkeleton } from "@/components/Skeleton";
 import { ErrorState, SetupNotice } from "@/components/StateViews";
@@ -16,8 +17,10 @@ import {
   renameTrip,
   revokeInvitation,
   setMemberActive,
+  setMemberRole,
+  setTripStatus,
 } from "@/lib/queries";
-import type { Invitation } from "@/lib/types";
+import type { Invitation, Member } from "@/lib/types";
 
 /**
  * Trip management: switch between your trips, create new ones, and (as
@@ -46,6 +49,9 @@ export default function TripsPage() {
   } | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  // Significant actions confirm via a bottom sheet before running.
+  const [pendingRemove, setPendingRemove] = useState<Member | null>(null);
+  const [pendingArchive, setPendingArchive] = useState(false);
 
   const isOwner = data?.myRole === "owner";
   const tripId = data?.trip?.id ?? null;
@@ -164,8 +170,41 @@ export default function TripsPage() {
       await setMemberActive(tripId, memberId, false);
       await refresh();
       note("Member removed from this trip. Their past expenses stay.");
+      setPendingRemove(null);
     } catch (err) {
       fail(err);
+      setPendingRemove(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSetRole(memberId: string, role: "owner" | "member") {
+    if (!tripId) return;
+    setBusy(true);
+    try {
+      await setMemberRole(tripId, memberId, role);
+      await refresh();
+      note(role === "owner" ? "Promoted to owner." : "Changed to member.");
+    } catch (err) {
+      fail(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleArchiveToggle() {
+    if (!tripId || !data?.trip) return;
+    const archiving = data.trip.status === "active";
+    setBusy(true);
+    try {
+      await setTripStatus(tripId, archiving ? "archived" : "active");
+      await refresh();
+      note(archiving ? "Trip archived. Expenses stay readable; adding new ones is disabled." : "Trip reactivated.");
+      setPendingArchive(false);
+    } catch (err) {
+      fail(err);
+      setPendingArchive(false);
     } finally {
       setBusy(false);
     }
@@ -337,13 +376,29 @@ export default function TripsPage() {
                     </span>
                   </span>
                   {isOwner && m.id !== data.myMemberId && (
-                    <button
-                      onClick={() => handleRemoveMember(m.id)}
-                      disabled={busy}
-                      className="tap rounded-full px-3 py-1.5 text-xs font-semibold text-negative disabled:opacity-60"
-                    >
-                      Remove
-                    </button>
+                    <span className="flex shrink-0 items-center gap-1">
+                      {m.userId && (
+                        <button
+                          onClick={() =>
+                            handleSetRole(
+                              m.id,
+                              m.role === "owner" ? "member" : "owner",
+                            )
+                          }
+                          disabled={busy}
+                          className="tap rounded-full px-2.5 py-1.5 text-xs font-semibold text-brand disabled:opacity-60"
+                        >
+                          {m.role === "owner" ? "Make member" : "Make owner"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setPendingRemove(m)}
+                        disabled={busy}
+                        className="tap rounded-full px-2.5 py-1.5 text-xs font-semibold text-negative disabled:opacity-60"
+                      >
+                        Remove
+                      </button>
+                    </span>
                   )}
                 </li>
               ))}
@@ -397,6 +452,32 @@ export default function TripsPage() {
                     Save
                   </button>
                 </form>
+              </div>
+
+              <div>
+                <h2 className="text-sm font-semibold">
+                  {data.trip.status === "active" ? "Archive trip" : "Reactivate trip"}
+                </h2>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  {data.trip.status === "active"
+                    ? "Archived trips stay readable but stop accepting new expenses."
+                    : "This trip is archived — reactivate it to add expenses again."}
+                </p>
+                <button
+                  onClick={() =>
+                    data.trip!.status === "active"
+                      ? setPendingArchive(true)
+                      : handleArchiveToggle()
+                  }
+                  disabled={busy}
+                  className={`tap mt-2 min-h-12 w-full rounded-2xl py-3 text-sm font-semibold disabled:opacity-60 ${
+                    data.trip.status === "active"
+                      ? "bg-negative/10 text-negative"
+                      : "bg-brand text-white shadow-lg shadow-brand/25"
+                  }`}
+                >
+                  {data.trip.status === "active" ? "Archive this trip" : "Reactivate this trip"}
+                </button>
               </div>
 
               <div>
@@ -475,6 +556,29 @@ export default function TripsPage() {
           {formError}
         </p>
       )}
+
+      <ConfirmSheet
+        open={pendingRemove !== null}
+        title={`Remove ${pendingRemove?.name ?? "member"}?`}
+        message="They'll leave this trip, but their past expenses and balances stay exactly as they are."
+        confirmLabel="Remove from trip"
+        busyLabel="Removing…"
+        cancelLabel="Cancel"
+        busy={busy}
+        onConfirm={() => pendingRemove && handleRemoveMember(pendingRemove.id)}
+        onCancel={() => setPendingRemove(null)}
+      />
+      <ConfirmSheet
+        open={pendingArchive}
+        title={`Archive ${data?.trip?.name ?? "this trip"}?`}
+        message="Everyone keeps read access to its expenses and balances, but no new expenses can be added until it's reactivated."
+        confirmLabel="Archive trip"
+        busyLabel="Archiving…"
+        cancelLabel="Cancel"
+        busy={busy}
+        onConfirm={handleArchiveToggle}
+        onCancel={() => setPendingArchive(false)}
+      />
     </div>
   );
 }
