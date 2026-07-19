@@ -117,13 +117,24 @@ export interface Invitation {
   token: string;
   expiresAt: Date;
   role: "owner" | "member";
-  status: "pending" | "accepted" | "revoked";
+  status: "pending" | "accepted" | "revoked" | "declined";
 }
 
 export interface InvitationPreview {
   tripName: string;
   memberName: string;
   isValid: boolean;
+}
+
+/** A pending invitation addressed to the signed-in user's own email. */
+export interface MyInvitation {
+  id: string;
+  token: string;
+  tripName: string;
+  memberName: string;
+  inviterName: string;
+  createdAt: Date;
+  expiresAt: Date;
 }
 
 export interface Expense {

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import {
   ChevronRightIcon,
+  MailIcon,
   MoonIcon,
   SparklesIcon,
   SunIcon,
@@ -12,6 +14,8 @@ import { useSession } from "@/hooks/useSession";
 import { setThemePreference, useTheme } from "@/hooks/useTheme";
 import { useTripData } from "@/hooks/useTripData";
 import type { ThemePreference } from "@/lib/constants";
+import { fetchMyInvitations } from "@/lib/queries";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 /**
  * Deployed commit, inlined at build time. Vercel exposes this
@@ -34,11 +38,19 @@ const THEME_OPTIONS: Array<{
 export default function SettingsPage() {
   const theme = useTheme();
   const { data } = useTripData();
-  const { session } = useSession();
+  const { session, status: sessionStatus } = useSession();
+  const [invitationCount, setInvitationCount] = useState(0);
 
   const myMember = data?.myMemberId
     ? data.members.find((m) => m.id === data.myMemberId)
     : undefined;
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || sessionStatus !== "authenticated") return;
+    fetchMyInvitations()
+      .then((list) => setInvitationCount(list.length))
+      .catch(() => {});
+  }, [sessionStatus]);
 
   return (
     <div className="space-y-6">
@@ -64,6 +76,24 @@ export default function SettingsPage() {
             {session?.user.email ?? "Signed in"}
           </span>
         </span>
+        <ChevronRightIcon className="size-4 shrink-0 text-ink-faint" />
+      </Link>
+
+      {/* Invitations — badge shown only when something's waiting */}
+      <Link
+        href="/invitations"
+        className="tap anim-fade-up glass flex min-h-14 items-center gap-3 rounded-3xl p-5"
+        style={{ animationDelay: "30ms" }}
+      >
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
+          <MailIcon className="size-5" strokeWidth={2} />
+        </span>
+        <span className="min-w-0 flex-1 text-sm font-semibold">Invitations</span>
+        {invitationCount > 0 && (
+          <span className="grid size-5 shrink-0 place-items-center rounded-full bg-negative text-[11px] font-bold text-white">
+            {invitationCount}
+          </span>
+        )}
         <ChevronRightIcon className="size-4 shrink-0 text-ink-faint" />
       </Link>
 

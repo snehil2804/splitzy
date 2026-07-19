@@ -1,6 +1,10 @@
 # Project Status
 
-_Last updated: 2026-07-20 (invitations on `feature/invitations`, not merged)_
+_Last updated: 2026-07-20 (invitations + inbox on `feature/invitations`, not merged)_
+
+## 📬 Invitations inbox (branch `feature/invitations`)
+
+New `/invitations` page (Settings → Invitations, with a pending-count badge): existing accounts accept/decline directly, no link required. Reuses `claim_invitation()` unchanged for Accept; new narrowly-scoped `decline_invitation()` for Decline (email-match scoped, never touches the member/trip). New-user link flow (`/join/[token]`) untouched. Verified live: `npm run test:invitations` 24/24 (was 13, +8 inbox checks, +3 from the earlier race fix). Full suite re-run clean: 20/20 unit, 17/17 db, 6/6 auth, build clean.
 
 ## 🔗 Invitations & member claiming (branch `feature/invitations`)
 

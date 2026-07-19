@@ -8,6 +8,7 @@ import type {
   InvitationPreview,
   InvitationRow,
   Member,
+  MyInvitation,
   Profile,
   ProfileRow,
   TripData,
@@ -315,6 +316,49 @@ export async function claimInvitation(token: string): Promise<string> {
   });
   if (error) throw new Error(error.message);
   return data as string;
+}
+
+/**
+ * Every pending invitation addressed to the signed-in user's own email —
+ * for the /invitations inbox, so an existing account can accept or decline
+ * without ever needing the link. Includes each invitation's token: Accept
+ * reuses `claimInvitation()` unchanged, since email-matching here is the
+ * same "prove you own this address" gate the link's preview already relies
+ * on for anonymous visitors.
+ */
+export async function fetchMyInvitations(): Promise<MyInvitation[]> {
+  const { data, error } = await getSupabase().rpc("list_my_invitations");
+  if (error) throw new Error(error.message);
+  return (
+    data as Array<{
+      id: string;
+      token: string;
+      trip_name: string;
+      member_name: string;
+      inviter_name: string;
+      created_at: string;
+      expires_at: string;
+    }>
+  ).map((row) => ({
+    id: row.id,
+    token: row.token,
+    tripName: row.trip_name,
+    memberName: row.member_name,
+    inviterName: row.inviter_name,
+    createdAt: new Date(row.created_at),
+    expiresAt: new Date(row.expires_at),
+  }));
+}
+
+/**
+ * Declines an invitation addressed to the signed-in user's own email —
+ * never touches the target member or trip, only this invitation's status.
+ */
+export async function declineInvitation(invitationId: string): Promise<void> {
+  const { error } = await getSupabase().rpc("decline_invitation", {
+    p_invitation_id: invitationId,
+  });
+  if (error) throw new Error(error.message);
 }
 
 /**

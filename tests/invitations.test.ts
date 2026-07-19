@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { formatDate } from "../src/lib/format";
 
 /**
  * `buildInviteLink`/`whatsappShareUrl` live inline in trips/page.tsx (not
@@ -36,4 +37,15 @@ test("WhatsApp share URL has no unencoded query-breaking characters", () => {
     "Trip & Friends?",
   );
   assert.ok(!/[&?](?!text=)/.test(url.split("?text=")[1] ?? ""));
+});
+
+test("formatDate produces a stable, compact absolute date (used for Sent/Expires)", () => {
+  const formatted = formatDate(new Date("2026-07-19T12:00:00Z"));
+  assert.match(formatted, /Jul/);
+  assert.match(formatted, /19/);
+});
+
+test("formatDate output is deterministic for the same instant", () => {
+  const date = new Date("2026-12-25T00:00:00Z");
+  assert.equal(formatDate(date), formatDate(date));
 });

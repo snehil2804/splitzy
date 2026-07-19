@@ -201,6 +201,94 @@ try {
   const { data: leak } = await second.from("expenses").select("id").eq("trip_id", tripId);
   ok("a non-member cannot read the trip's expenses", (leak ?? []).length === 0);
 
+  // ── 8. invitations inbox: list_my_invitations() + decline_invitation() —
+  //    the existing-account path, no link/token entry required ────────────
+  const { data: inboxGid, error: inboxGErr } = await owner.rpc("add_guest_member", {
+    p_trip_id: tripId,
+    p_name: `E2E Guest Inbox ${Date.now()}`,
+  });
+  if (inboxGErr) throw inboxGErr;
+  const inboxGuestId = inboxGid;
+  const inboxEmail = `splitzy-inv-inbox-${Date.now()}@example.com`;
+  const { data: inboxToken, error: inboxInvErr } = await owner.rpc("invite_member", {
+    p_trip_id: tripId,
+    p_member_id: inboxGuestId,
+    p_email: inboxEmail,
+  });
+  if (inboxInvErr) throw inboxInvErr;
+  const { data: inboxInvRow } = await admin
+    .from("invitations")
+    .select("id")
+    .eq("token", inboxToken)
+    .single();
+
+  const { data: inboxCreated, error: inboxUErr } = await admin.auth.admin.createUser({
+    email: inboxEmail,
+    email_confirm: true,
+  });
+  if (inboxUErr) throw inboxUErr;
+  const inboxUserId = inboxCreated.user.id;
+  const inboxUser = await sessionFor(inboxEmail);
+
+  const { data: mine, error: listErr } = await inboxUser.rpc("list_my_invitations");
+  const mineRow = mine?.find((r) => r.id === inboxInvRow.id);
+  ok(
+    "list_my_invitations surfaces an invite addressed to my email, with trip/member/inviter names + token",
+    !listErr &&
+      mineRow?.trip_name === "E2E Invite Trip" &&
+      mineRow?.member_name?.startsWith("E2E Guest Inbox") &&
+      typeof mineRow?.token === "string" &&
+      mineRow.token === inboxToken,
+    listErr?.message ?? "",
+  );
+
+  const { data: strangerList } = await second.rpc("list_my_invitations");
+  ok(
+    "list_my_invitations never shows another account's invite",
+    !strangerList?.some((r) => r.id === inboxInvRow.id),
+  );
+
+  const { error: strangerDeclineErr } = await second.rpc("decline_invitation", {
+    p_invitation_id: inboxInvRow.id,
+  });
+  ok("a different account cannot decline someone else's invitation", Boolean(strangerDeclineErr));
+
+  const { error: declineErr } = await inboxUser.rpc("decline_invitation", {
+    p_invitation_id: inboxInvRow.id,
+  });
+  ok("the addressed account can decline its own invitation", !declineErr, declineErr?.message ?? "");
+
+  const { data: afterDecline } = await admin
+    .from("invitations")
+    .select("status")
+    .eq("id", inboxInvRow.id)
+    .single();
+  ok("declining sets status to 'declined'", afterDecline?.status === "declined");
+
+  const { data: memberAfterDecline } = await admin
+    .from("members")
+    .select("user_id")
+    .eq("id", inboxGuestId)
+    .single();
+  ok("declining never touches the member or trip", memberAfterDecline?.user_id === null);
+
+  const { data: listAfterDecline } = await inboxUser.rpc("list_my_invitations");
+  ok(
+    "a declined invitation disappears from the pending list",
+    !listAfterDecline?.some((r) => r.id === inboxInvRow.id),
+  );
+
+  const { error: acceptAfterDeclineErr } = await inboxUser.rpc("claim_invitation", {
+    p_token: inboxToken,
+  });
+  ok("a declined invitation's link can no longer be claimed", Boolean(acceptAfterDeclineErr));
+
+  await admin.from("invitations").delete().eq("id", inboxInvRow.id);
+  await admin.from("trip_members").delete().eq("trip_id", tripId).eq("member_id", inboxGuestId);
+  await admin.from("members").delete().eq("id", inboxGuestId);
+  await admin.auth.admin.deleteUser(inboxUserId);
+  await inboxUser.auth.signOut();
+
   // ── regression: the frontend used to fire accept_my_invitations() (the
   //    email-matched auto-claim) on every login, racing /join's explicit
   //    claim_invitation() whenever an invite carried a matching email —

@@ -1,6 +1,14 @@
 # Changelog
 
-## [Unreleased] — Fix: invite claim race with matching email (branch `feature/invitations`)
+## [Unreleased] — Invitations inbox: accept/decline without the link (branch `feature/invitations`)
+
+Existing accounts no longer have to open the invite link to join — a new `/invitations` page (linked from Settings, with a pending-count badge) lists every pending invite addressed to the signed-in user's own email, with Accept/Decline. Reuses the existing architecture unchanged: Accept calls the same `claim_invitation()` RPC the link flow already uses (no new claim logic); Decline is a new, narrowly-scoped RPC that only ever flips this one invitation's own status — it never touches the target member or trip.
+
+- Migration `20260720140000_invitations_inbox` (additive): widens `invitations.status` to allow `'declined'`; adds `list_my_invitations()` (SECURITY DEFINER, `authenticated`-only, returns trip/member/inviter names + the token, scoped to `lower(email) = caller's verified JWT email` — the exact ownership proof `preview_invitation()` already uses for anonymous link visitors) and `decline_invitation()` (same email-match scoping, `status='pending' → 'declined'` only)
+- Users without an account are unaffected — they still only ever see the link flow (`/join/[token]`), since `list_my_invitations()` requires a session
+- Tests: +2 unit (`formatDate`, new shared date-display helper); live suite (`npm run test:invitations`) now 24/24 — added: invite surfaces in the intended account's inbox with correct trip/member/inviter/token, never in another account's inbox, decline is self-only (a different account can't decline someone else's invite), decline never touches the member/trip, a declined invite disappears from the pending list and its link can no longer be claimed
+
+## [Fix] — invite claim race with matching email
 
 **Root cause**: `useSession.ts` auto-fired the legacy `accept_my_invitations()` (email-matched auto-claim) on *every* login, racing `/join/[token]`'s explicit `claim_invitation()` whenever an invite carried an email matching the signer's own — both targeted the same row on the same sign-in event. Confirmed in the DB: the affected invitation showed `status: 'accepted'`, `accepted_by: null` — proof the background path (which never sets `accepted_by`) won the race, correctly linked the member, then `/join` found a non-pending row and showed "invite expired/revoked" even though the user was already correctly joined. No data corruption at any point — purely a confusing UI outcome from two correct mechanisms competing.
 
