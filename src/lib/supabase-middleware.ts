@@ -5,9 +5,11 @@ import { NextResponse, type NextRequest } from "next/server";
  * Routes reachable while signed out. Everything else redirects to `/login`.
  * `/api` is listed because API routes must answer 401 JSON themselves
  * (`/api/expenses` verifies the session cookie) — a login-page redirect is
- * the wrong response shape for a programmatic caller.
+ * the wrong response shape for a programmatic caller. `/join/<token>` must
+ * also stay reachable signed-out — it shows the invite preview and the
+ * sign-in CTA itself.
  */
-const PUBLIC_PATHS = ["/login", "/auth", "/api"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api", "/join"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

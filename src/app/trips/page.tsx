@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
-import { CheckIcon, PlusIcon } from "@/components/icons";
+import { CheckIcon, LinkIcon, PlusIcon, ShareIcon, WhatsAppIcon } from "@/components/icons";
 import { CardSkeleton } from "@/components/Skeleton";
 import { ErrorState, SetupNotice } from "@/components/StateViews";
 import { setSelectedTripId } from "@/hooks/useSelectedTrip";
@@ -21,6 +21,17 @@ import {
   setTripStatus,
 } from "@/lib/queries";
 import type { Invitation, Member } from "@/lib/types";
+
+type GeneratedInvite = { link: string; memberName: string };
+
+function buildInviteLink(token: string): string {
+  return `${window.location.origin}/join/${token}`;
+}
+
+function whatsappShareUrl(link: string, tripName: string): string {
+  const text = `Join "${tripName}" on Splitzy to track our shared expenses: ${link}`;
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+}
 
 /**
  * Trip management: switch between your trips, create new ones, and (as
@@ -40,9 +51,16 @@ export default function TripsPage() {
   } | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [guestName, setGuestName] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteMode, setInviteMode] = useState<"existing" | "new">("existing");
   const [inviteMemberId, setInviteMemberId] = useState<string | "">("");
+  const [inviteNewName, setInviteNewName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [generatedInvite, setGeneratedInvite] = useState<GeneratedInvite | null>(null);
+  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Snapshot once per page load — "pending vs expired" doesn't need to be
+  // live-reactive, and calling Date.now() at render time isn't pure.
+  const [now] = useState(() => Date.now());
   const [fetchedInvitations, setFetchedInvitations] = useState<{
     tripId: string;
     list: Invitation[];
@@ -134,18 +152,57 @@ export default function TripsPage() {
 
   async function handleInvite(e: FormEvent) {
     e.preventDefault();
-    if (!tripId || !inviteEmail.trim()) return;
+    if (!tripId) return;
+    const creatingGuest = effectiveInviteMode === "new";
+    if (creatingGuest && !inviteNewName.trim()) return;
+    if (!creatingGuest && !inviteMemberId) return;
+
     setBusy(true);
     try {
-      await inviteMember(tripId, inviteEmail.trim(), inviteMemberId || null);
-      setInviteEmail("");
+      const memberId = creatingGuest
+        ? await addGuestMember(tripId, inviteNewName.trim())
+        : inviteMemberId;
+      const token = await inviteMember(tripId, memberId, inviteEmail.trim() || undefined);
+      const memberName = creatingGuest
+        ? inviteNewName.trim()
+        : (data?.members.find((m) => m.id === memberId)?.name ?? "them");
+
+      setGeneratedInvite({ link: buildInviteLink(token), memberName });
+      setCopied(false);
+      setInviteNewName("");
       setInviteMemberId("");
-      setFetchedInvitations({ tripId, list: await fetchInvitations(tripId) });
-      note("Invitation created. They'll join automatically after signing in with that email.");
+      setInviteEmail("");
+      await Promise.all([
+        refresh(),
+        fetchInvitations(tripId).then((list) => setFetchedInvitations({ tripId, list })),
+      ]);
+      note("Invite link created.");
     } catch (err) {
       fail(err);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleCopyLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      fail(new Error("Couldn't copy — long-press the link to copy it manually."));
+    }
+  }
+
+  async function handleNativeShare(link: string, memberName: string, tripName: string) {
+    try {
+      await navigator.share({
+        title: "Splitzy invite",
+        text: `Join "${tripName}" on Splitzy as ${memberName}`,
+        url: link,
+      });
+    } catch {
+      // User cancelled the share sheet — not an error.
     }
   }
 
@@ -279,6 +336,9 @@ export default function TripsPage() {
   if (!data) return null;
 
   const unclaimedMembers = data.members.filter((m) => !m.userId);
+  // Can't default to "existing" with nothing to pick — fall back to "new"
+  // for rendering without discarding the user's own toggle choice.
+  const effectiveInviteMode = unclaimedMembers.length === 0 ? "new" : inviteMode;
 
   return (
     <div className="space-y-6">
@@ -481,63 +541,165 @@ export default function TripsPage() {
               </div>
 
               <div>
-                <h2 className="text-sm font-semibold">Invite by email</h2>
+                <h2 className="text-sm font-semibold">Invite someone</h2>
                 <p className="mt-0.5 text-xs text-ink-muted">
-                  They join this trip automatically when they sign in with that
-                  email. Link the invite to a guest so they claim that identity
-                  and its expense history.
+                  Generate a link for a specific person — they sign in and
+                  claim exactly that identity, with its expense history.
                 </p>
+
+                <div className="mt-2 grid grid-cols-2 gap-2 rounded-2xl bg-line/60 p-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setInviteMode("existing")}
+                    disabled={unclaimedMembers.length === 0}
+                    aria-pressed={effectiveInviteMode === "existing"}
+                    className={`tap rounded-xl py-2.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
+                      effectiveInviteMode === "existing"
+                        ? "bg-surface-strong text-brand shadow-sm"
+                        : "text-ink-muted"
+                    }`}
+                  >
+                    Existing guest
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInviteMode("new")}
+                    aria-pressed={effectiveInviteMode === "new"}
+                    className={`tap rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                      effectiveInviteMode === "new"
+                        ? "bg-surface-strong text-brand shadow-sm"
+                        : "text-ink-muted"
+                    }`}
+                  >
+                    New guest
+                  </button>
+                </div>
+
                 <form onSubmit={handleInvite} className="mt-2 space-y-2">
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="friend@example.com"
-                    className="min-h-12 w-full rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-brand"
-                  />
-                  {unclaimedMembers.length > 0 && (
+                  {effectiveInviteMode === "existing" ? (
                     <select
                       value={inviteMemberId}
                       onChange={(e) => setInviteMemberId(e.target.value)}
                       className="min-h-12 w-full appearance-none rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-brand"
                     >
-                      <option value="">Don&apos;t link to a guest</option>
+                      <option value="">Choose a guest…</option>
                       {unclaimedMembers.map((m) => (
                         <option key={m.id} value={m.id}>
-                          This is {m.name}
+                          {m.name}
                         </option>
                       ))}
                     </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={inviteNewName}
+                      onChange={(e) => setInviteNewName(e.target.value)}
+                      placeholder="Their name"
+                      maxLength={60}
+                      className="min-h-12 w-full rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-brand"
+                    />
                   )}
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="Their email (optional, just for your records)"
+                    className="min-h-12 w-full rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-brand"
+                  />
                   <button
                     type="submit"
-                    disabled={busy || !inviteEmail.trim()}
+                    disabled={
+                      busy ||
+                      (effectiveInviteMode === "existing" ? !inviteMemberId : !inviteNewName.trim())
+                    }
                     className="tap w-full min-h-12 rounded-2xl bg-brand py-3 text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
                   >
-                    Send invitation
+                    Generate invite link
                   </button>
                 </form>
 
+                {generatedInvite && (
+                  <div className="anim-fade-in mt-3 space-y-2.5 rounded-2xl bg-brand-soft p-4">
+                    <p className="text-sm font-semibold">
+                      Link ready for {generatedInvite.memberName}
+                    </p>
+                    <p className="truncate rounded-xl bg-surface-strong px-3 py-2 text-xs text-ink-muted">
+                      {generatedInvite.link}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLink(generatedInvite.link)}
+                        className="tap flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl bg-surface-strong text-xs font-semibold"
+                      >
+                        <LinkIcon className="size-4" />
+                        {copied ? "Copied!" : "Copy"}
+                      </button>
+                      <a
+                        href={whatsappShareUrl(generatedInvite.link, data.trip.name)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="tap flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl bg-surface-strong text-xs font-semibold"
+                      >
+                        <WhatsAppIcon className="size-4" />
+                        WhatsApp
+                      </a>
+                      {typeof navigator !== "undefined" && "share" in navigator && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleNativeShare(
+                              generatedInvite.link,
+                              generatedInvite.memberName,
+                              data.trip!.name,
+                            )
+                          }
+                          className="tap flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl bg-surface-strong text-xs font-semibold"
+                        >
+                          <ShareIcon className="size-4" />
+                          Share
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {invitations.length > 0 && (
                   <ul className="mt-3 space-y-2">
-                    {invitations.map((inv) => (
-                      <li
-                        key={inv.id}
-                        className="flex min-h-12 items-center gap-3 rounded-2xl bg-line/60 px-4 py-2.5"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm">{inv.email}</span>
-                          <span className="text-xs text-ink-muted">Pending</span>
-                        </span>
-                        <button
-                          onClick={() => handleRevoke(inv.id)}
-                          disabled={busy}
-                          className="tap rounded-full px-3 py-1.5 text-xs font-semibold text-negative disabled:opacity-60"
+                    {invitations.map((inv) => {
+                      const expired = inv.expiresAt.getTime() < now;
+                      return (
+                        <li
+                          key={inv.id}
+                          className="flex min-h-12 items-center gap-3 rounded-2xl bg-line/60 px-4 py-2.5"
                         >
-                          Revoke
-                        </button>
-                      </li>
-                    ))}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium">
+                              {inv.memberName ?? "Invite"}
+                            </span>
+                            <span className="text-xs text-ink-muted">
+                              {expired ? "Expired" : "Pending"}
+                              {inv.email ? ` · ${inv.email}` : ""}
+                            </span>
+                          </span>
+                          <button
+                            onClick={() => handleCopyLink(buildInviteLink(inv.token))}
+                            disabled={busy || expired}
+                            aria-label="Copy invite link"
+                            className="tap rounded-full px-2.5 py-1.5 text-xs font-semibold text-brand disabled:opacity-40"
+                          >
+                            <LinkIcon className="size-4" />
+                          </button>
+                          <button
+                            onClick={() => handleRevoke(inv.id)}
+                            disabled={busy}
+                            className="tap rounded-full px-3 py-1.5 text-xs font-semibold text-negative disabled:opacity-60"
+                          >
+                            Revoke
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

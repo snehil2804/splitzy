@@ -46,6 +46,11 @@ export function formatDayLabel(date: Date): string {
   return dayFormat.format(date);
 }
 
+/** "Sat, 19 Jul" — compact absolute date, for things that aren't "recent". */
+export function formatDate(date: Date): string {
+  return dayFormat.format(date);
+}
+
 /** Stable key for grouping expenses by calendar day. */
 export function dayKey(date: Date): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
