@@ -23,9 +23,17 @@ export async function getSupabaseAuthServer() {
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options),
           );
-        } catch {
-          // Called from a Server Component, which can't set cookies —
-          // proxy.ts refreshes the session on the next request instead.
+        } catch (err) {
+          // Expected when called from a Server Component (can't set
+          // cookies there) — proxy.ts refreshes the session on the next
+          // request instead. Logged (not swallowed silently) so a genuine
+          // failure in a Route Handler, where this must never throw, is
+          // visible in server logs instead of masquerading as "it just
+          // didn't work."
+          console.error(
+            "getSupabaseAuthServer: cookie write failed",
+            err instanceof Error ? err.message : err,
+          );
         }
       },
     },
