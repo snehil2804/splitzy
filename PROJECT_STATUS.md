@@ -6,19 +6,11 @@ _Last updated: 2026-07-19 (**MERGED TO MAIN + DEPLOYED TO PRODUCTION** — `075a
 
 New login flow (Google primary, same-screen 8-digit email code, magic link as in-email fallback) with a rewritten callback and friendly error codes. See CHANGELOG "Unreleased".
 
-## 🔎 Auth diagnostics: Google OAuth lands back on production, not Preview
+## ✅ Google OAuth fixed and verified (2026-07-19)
 
-**Root cause found via Supabase auth logs (no code bug):** every single Google OAuth log entry (`/authorize`, `/callback`, the successful `login` auth_event) traces back to `referer: https://splitzy-delta.vercel.app` — never the Preview origin — across the entire log window. GoTrue's own Google handshake succeeds every time (5 clean 302s, user linked correctly). The failure is that **Supabase is redirecting the completed OAuth flow to the Site URL (production) instead of back to the Preview deployment**, because the Preview's exact `redirectTo` isn't on the Redirect URLs allow-list — GoTrue falls back to Site URL when `redirect_to` doesn't match. Production then serves its own (older, pre-Google-button) `/auth/callback` and `/login` — matching the reported "returns to the old /login page" exactly.
+**Root cause was not a code bug**, found via Supabase auth logs: every Google OAuth event traced to `referer: https://splitzy-delta.vercel.app` (production) instead of the Preview origin, because the Preview's exact `redirectTo` wasn't on the Redirect URLs allow-list — GoTrue fell back to Site URL (production, still pre-Google at the time). Fixed by adding the wildcard `https://splitzy-*-snehils-projects-979efd30.vercel.app/**` to Supabase's Redirect URLs (self-healing for every future Preview push, since Supabase's wildcard separators are `.` and `/` only, so `*` correctly spans the per-deployment hash).
 
-**This cannot be fixed in application code** — it's purely a Supabase dashboard allow-list gap, and every `git push` mints a new unique Preview hostname, so an exact-URL entry goes stale immediately.
-
-**Fix (dashboard, one-time — self-healing for all future Preview pushes):** Authentication → URL Configuration → Redirect URLs → add the wildcard:
-```
-https://splitzy-*-snehils-projects-979efd30.vercel.app/**
-```
-(Supabase's wildcard separators are `.` and `/` only — a bare `*` correctly spans the per-deployment hash segment between hyphens.) Keep the existing `https://splitzy-delta.vercel.app/**` and `http://localhost:3777/**` entries as-is.
-
-Temporary diagnostic logging (`[auth-cb] host=… hasCode=… hasTokenHash=…`, `exchangeCodeForSession ok=…`, `post-exchange getUser present=…`) was added to `/auth/callback` for this investigation — safe (no codes/tokens/cookies logged), left in place pending one more confirmed successful Preview run, then to be removed.
+**Verified in the auth logs after the fix**: `/authorize` and `/callback` referer both show the Preview origin (`…cl7ow34ic-…vercel.app/auth/callback?next=%2F`), `/callback` → 302 with a successful `login {provider: google}` event, followed by `/token` 200 and `/user` 200 — session fully established and readable. Temporary diagnostic logging added during the investigation has been removed; the SSR cookie-adapter's error logging (previously a silent swallow) stays as permanent hardening.
 
 **Manual Supabase dashboard steps still required (cannot be done via API):**
 1. **Email templates** (Authentication → Email Templates): the current default sends only a link. For the code flow the email must show the code, and for cross-context-safe links the URL must use the token-hash form. Update **Magic Link** (and **Confirm signup**, used for first-time-signup emails) to include, e.g.:
