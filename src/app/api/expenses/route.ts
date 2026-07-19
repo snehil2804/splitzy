@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
+import { getSupabaseAuthServer } from "@/lib/supabase-auth-server";
 import { getSupabaseServer, isSupabaseServerConfigured } from "@/lib/supabase-server";
 
 /**
- * Server-side entry point for adding an expense. The browser never calls
- * `add_equal_expense()` directly — that RPC is service_role-only — so this
- * route validates the request, then calls it with the secret-key client.
- * The function itself still owns the equal-split math, paise rounding, and
- * participant/payer validation; this route only checks shape and range.
+ * Legacy name-based entry point for adding an expense, kept for the future
+ * Apple Shortcut pipeline (the web app now calls the `add_expense()` RPC
+ * directly). `add_equal_expense()` is service_role-only, so the call happens
+ * here with the secret-key client — but only for a signed-in caller: the
+ * session cookie is verified first, and membership of the target trip is
+ * enforced before the privileged RPC runs.
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,6 +40,14 @@ export async function POST(request: Request) {
       { error: "The server isn't configured to add expenses yet." },
       { status: 503 },
     );
+  }
+
+  const authClient = await getSupabaseAuthServer();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   }
 
   let body: AddExpenseRequestBody;
@@ -100,6 +110,20 @@ export async function POST(request: Request) {
   }
   if (!isOptionalString(locationName)) {
     return badRequest("Invalid location.");
+  }
+
+  // Membership check through the caller's own RLS-scoped client: a trip the
+  // user isn't an active member of is simply invisible to them.
+  const { data: visibleTrip } = await authClient
+    .from("trips")
+    .select("id")
+    .eq("id", tripId)
+    .maybeSingle();
+  if (!visibleTrip) {
+    return NextResponse.json(
+      { error: "You are not a member of this trip." },
+      { status: 403 },
+    );
   }
 
   try {

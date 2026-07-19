@@ -26,6 +26,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Mobile keyboards shrink the layout instead of overlaying the tab bar
+  // on top of focused inputs.
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f5f4fb" },
     { media: "(prefers-color-scheme: dark)", color: "#0b0a12" },
@@ -48,7 +51,7 @@ export default function RootLayout({
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <div aria-hidden className="app-glow pointer-events-none fixed inset-0" />
-        <main className="relative mx-auto min-h-dvh max-w-md px-4 pb-32 pt-[calc(1.25rem+env(safe-area-inset-top))]">
+        <main className="relative mx-auto min-h-dvh max-w-md px-4 pb-[var(--tabbar-clearance)] pt-[calc(1.25rem+env(safe-area-inset-top))]">
           {children}
         </main>
         <TabBar />

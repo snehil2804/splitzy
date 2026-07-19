@@ -5,7 +5,6 @@ import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { ExpenseCard } from "@/components/ExpenseCard";
 import { ListSkeleton } from "@/components/Skeleton";
 import { EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
-import { useIdentity } from "@/hooks/useIdentity";
 import { useTripData } from "@/hooks/useTripData";
 import { totalSpent } from "@/lib/balances";
 import { dayKey, formatDayLabel, formatINR } from "@/lib/format";
@@ -13,7 +12,6 @@ import type { Expense } from "@/lib/types";
 
 export default function ExpensesPage() {
   const { status, data, error, refresh, deleteExpense } = useTripData();
-  const identity = useIdentity();
   const [pendingDelete, setPendingDelete] = useState<Expense | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -38,13 +36,8 @@ export default function ExpensesPage() {
     return [...groups.values()];
   }, [data?.expenses]);
 
-  /** Member id for `expenses.deleted_by`, from the device identity. */
-  const myMemberId =
-    (identity &&
-      data?.members.find(
-        (m) => m.name.toLowerCase() === identity.toLowerCase(),
-      )?.id) ||
-    null;
+  /** Member id for `expenses.deleted_by`, from the signed-in account. */
+  const myMemberId = data?.myMemberId ?? null;
 
   async function confirmDelete() {
     if (!pendingDelete) return;

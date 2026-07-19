@@ -1,17 +1,22 @@
 # Project Status
 
-_Last updated: 2026-07-19 (Stage 1 auth implemented on `feature/auth-multi-trip` — not merged)_
+_Last updated: 2026-07-19 (Stage 2 complete on `feature/auth-multi-trip` — not merged)_
 
-## 🔐 Stage 1: authentication (in progress, branch `feature/auth-multi-trip`)
+## 🔐 Stage 2: authenticated multi-trip (complete on branch, not merged)
 
-Supabase SSR magic-link auth implemented per the Stage 0 audit's plan (PKCE flow, invite-only signup). `npx tsc --noEmit`, `npm run lint`, and `npm run build` all clean; dev-server smoke test confirmed: unauthenticated `/` → 307 to `/login`, `/login` → 200, `/auth/callback` with no code → 307 to `/login?error=...`, `/icon` unaffected (200, not redirected). Secret-key bundle check re-run and still clean (see CHANGELOG "Unreleased" entry for the full file list).
+Full implementation per the approved Stage 0 plan — see CHANGELOG "Unreleased" for the complete change list. Highlights:
 
-**Not done yet, by design** — approved Stage 1 scope excluded these:
-- No `authenticated`-role RLS policies yet. **Consequence: once someone actually signs in, `fetchTripData()` will fail** — only `anon` has SELECT grants/policies today, and Postgres denies by default with RLS enabled and no matching policy. The login flow itself (magic link → callback → session → redirect) works independently of this; only the post-login data fetch is affected. This is the first item for Stage 2 approval.
-- `/api/expenses` has no auth check — still callable by anyone with the URL, unchanged from before Stage 1.
-- No real Supabase Auth users created; no email↔member mapping applied; nothing merged to `main` or deployed.
+- **Auth fixed and verified end-to-end**: "Signups not allowed for otp" was Stage 1's `shouldCreateUser: false` with zero users in `auth.users`; now open-signup + RLS. A disposable-test-user run passed 15/15 checks (magic-link token → session, RLS isolation, anon lockout, RPCs, splits, sign-out), then removed every row it created; baseline re-verified byte-identical (1 trip / 3 members / 3 expenses / ₹900 live / same IDs).
+- **Database**: 4 additive migrations (`auth_multitrip_schema`, `authenticated_rls_cutover`, `multitrip_rpcs`, `fix_accept_invitations_qualified_call`). All existing rows and IDs untouched — verified by count/ID/sum comparison before and after. Anonymous access fully removed.
+- **Web app**: multi-trip switcher (`/trips`), profile page (`/profile`), invitations + guest members, dashboard stat tiles (Trip Total / You Paid / Your Share / Your Balance), authenticated identity everywhere (no "Who are you?" picker), responsive tab-bar/safe-area/keyboard fixes.
+- `tsc --noEmit`, `lint`, `build` clean; secret-key bundle grep clean; dev-server smoke test: all pages 307→`/login` unauthenticated, `/login` 200, `/api/expenses` 401 JSON without a session.
 
-See CHANGELOG.md "Unreleased" for the exact file list.
+## ⏭ Remaining before merge to main
+
+1. **Human end-to-end pass on the Vercel preview or localhost**: sign up with your real email, create/see trips, invite Shruti & Anshul (linking their guest identities), add + delete an expense from the UI.
+2. **Bootstrap Default Trip ownership** (one-time, after Snehil first signs in): no auth user exists yet, so nobody owns Default Trip. Either (a) sign up, create nothing, then ask me to link your user to member "Snehil" + set your `trip_members.role='owner'` on Default Trip (two UPDATE statements I'll present for approval), or (b) abandon Default Trip and recreate the trip in-app (loses the ₹900 test expense's trip context — not recommended).
+3. **Custom SMTP before Shruti/Anshul onboard** — built-in email only delivers to project-team addresses (~2/hour).
+4. Merge + production deploy (needs your explicit go).
 
 ## ✅ Completed
 

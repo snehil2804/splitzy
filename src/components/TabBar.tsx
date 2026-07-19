@@ -20,7 +20,7 @@ export function TabBar() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
     >
       <div className="glass flex items-center justify-between rounded-[1.75rem] px-3 py-2">
         {TABS.map(({ href, label, Icon, ...tab }) => {
@@ -43,7 +43,7 @@ export function TabBar() {
               href={href}
               aria-label={label}
               aria-current={active ? "page" : undefined}
-              className={`tap flex min-w-14 flex-col items-center gap-0.5 rounded-2xl px-2 py-1.5 transition-colors ${
+              className={`tap flex min-h-11 min-w-14 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 transition-colors ${
                 active ? "text-brand" : "text-ink-faint hover:text-ink-muted"
               }`}
             >

@@ -64,7 +64,10 @@ function LoginForm() {
         email: trimmed,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
-          shouldCreateUser: false,
+          // Open signup: a brand-new email gets an account on first login.
+          // Safe because RLS only shows trips you're an active member of —
+          // a stranger who signs up sees an empty app, no trip data.
+          shouldCreateUser: true,
         },
       });
       if (error) throw error;

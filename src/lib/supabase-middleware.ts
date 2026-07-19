@@ -1,8 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/** Routes reachable while signed out. Everything else redirects to `/login`. */
-const PUBLIC_PATHS = ["/login", "/auth"];
+/**
+ * Routes reachable while signed out. Everything else redirects to `/login`.
+ * `/api` is listed because API routes must answer 401 JSON themselves
+ * (`/api/expenses` verifies the session cookie) — a login-page redirect is
+ * the wrong response shape for a programmatic caller.
+ */
+const PUBLIC_PATHS = ["/login", "/auth", "/api"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

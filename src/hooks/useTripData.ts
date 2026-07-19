@@ -4,10 +4,12 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { fetchTripData, softDeleteExpense } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import type { TripData } from "@/lib/types";
+import { getSelectedTripId, useSelectedTripId } from "./useSelectedTrip";
 
 /**
  * Minimal shared data store (SWR-style) so every page reads the same cache:
  * tab switches render instantly from cache while a background refresh runs.
+ * Keyed by the selected trip — switching trips forces a fresh load.
  */
 
 export type TripDataStatus = "loading" | "ready" | "error" | "unconfigured";
@@ -26,6 +28,7 @@ let state: StoreState = {
   error: null,
 };
 let fetchedAt = 0;
+let fetchedForTripId: string | null = null;
 let inflight: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
@@ -46,19 +49,27 @@ const getServerSnapshot = () => serverSnapshot;
 async function load(force = false): Promise<void> {
   if (!isSupabaseConfigured) return;
   if (inflight) return inflight;
+  const selectedTripId = getSelectedTripId();
+  const sameTrip = fetchedForTripId === selectedTripId;
   const fresh = Date.now() - fetchedAt < STALE_AFTER_MS;
-  if (!force && fresh && state.data) return;
+  if (!force && sameTrip && fresh && state.data) return;
 
   inflight = (async () => {
-    // Keep showing cached data during background refreshes.
-    if (!state.data) setState({ status: "loading", error: null });
+    // Keep showing cached data during same-trip background refreshes, but
+    // show the loading state when switching to a different trip.
+    if (!state.data || !sameTrip) setState({ status: "loading", error: null });
     try {
-      const data = await fetchTripData();
+      const data = await fetchTripData(selectedTripId);
       fetchedAt = Date.now();
+      fetchedForTripId = selectedTripId;
       setState({ status: "ready", data, error: null });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong";
-      setState(state.data ? { error: message } : { status: "error", error: message });
+      setState(
+        state.data && sameTrip
+          ? { error: message }
+          : { status: "error", error: message },
+      );
     } finally {
       inflight = null;
     }
@@ -68,16 +79,17 @@ async function load(force = false): Promise<void> {
 
 export function useTripData() {
   const store = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const selectedTripId = useSelectedTripId();
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [selectedTripId]);
 
   const refresh = useCallback(() => load(true), []);
 
   /**
    * Optimistically removes the expense, then persists the soft delete.
-   * `deletedById` = the member using this device (audit column), or null.
+   * `deletedById` = the signed-in user's member id (audit column), or null.
    */
   const deleteExpense = useCallback(
     async (expenseId: string, deletedById: string | null) => {

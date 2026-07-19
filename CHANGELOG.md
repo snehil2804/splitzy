@@ -1,6 +1,32 @@
 # Changelog
 
-## [Unreleased] — Stage 1: authentication (branch `feature/auth-multi-trip`)
+## [Unreleased] — Stage 2: authenticated multi-trip (branch `feature/auth-multi-trip`)
+
+### Fixed — "Signups not allowed for otp" on the login page
+
+Root cause: Stage 1's `shouldCreateUser: false` (invite-only) combined with an empty `auth.users` — every login attempt was a "new user" and GoTrue rejected it. Now `shouldCreateUser: true`: open signup is safe because RLS only reveals trips you're an active member of; a stranger who signs up sees an empty app.
+
+### Database (4 migrations, all additive — verified zero changes to existing rows/IDs)
+
+- `profiles` (auto-created by trigger on `auth.users` insert), `invitations` (owner-issued, optionally linked to an unclaimed guest member so accepting claims that identity + history)
+- Added: `members.user_id` (null = guest), `trips.created_by`, `trip_members.role/is_active/left_at`, `expenses.created_by`
+- Widened `expenses_valid_participant_count` from `1..3` to `>= 1` (any trip size)
+- **RLS cutover**: all 6 `anon` policies dropped, `anon` grants revoked — anonymous users get nothing. New `authenticated` policies scope everything to active trip membership via `is_trip_member()` / `is_trip_owner()` (SECURITY DEFINER helpers). Writes restricted to column-scoped grants (soft-delete columns on `expenses`; `name/description/status/ended_at` on `trips` for owners; `display_name` on own profile) — everything else via RPC
+- New RPCs (SECURITY DEFINER, `authenticated`-only EXECUTE): `create_trip`, `add_guest_member`, `invite_member`, `revoke_invitation`, `accept_my_invitations`, `set_trip_member_active`, `ensure_my_member`, and `add_expense` (ID-based, any trip size, cross-trip/participant validation, paise rounding copied from `add_equal_expense`)
+- Verified by an automated end-to-end run with a disposable test user (15/15 checks: session, RLS isolation, anon lockout, owner role, guest members, split math, cross-trip rejection, column-grant enforcement, sign-out) — all test rows and the test user removed afterwards; baseline data re-verified intact
+
+### App
+
+- Multi-trip: trip switcher + create/rename/manage on new `/trips`; selected trip persisted per device (`splitzy:tripId`); `fetchTripData(tripId)` now reads members from `trip_members`
+- Identity is the signed-in account: `useIdentity`/"Who are you?" removed everywhere; `myMemberId`/`myRole` derived from `members.user_id`; pending invitations auto-accepted after login
+- New `/profile` (display name, linked member, sign out); Settings slimmed (profile + trips links, theme, about)
+- Dashboard: "Total spent" → **Trip Total**; new You Paid / Your Share / Your Balance stat tiles
+- Add Expense now calls `add_expense()` directly from the browser (RLS/definer-validated); `POST /api/expenses` kept for the future Shortcut path but now requires a session (401) and trip membership (403)
+- Hardcoded members removed (avatar colors are name-hashed; no `DEFAULT_MEMBERS`)
+- Responsive: `--tabbar-clearance` variable drives content padding + `scroll-padding-bottom`; tab bar uses `max(0.75rem, safe-area-inset-bottom)`; `interactiveWidget: resizes-content` so keyboards don't cover inputs; ≥44px touch targets on nav/list rows
+- Proxy: `/api/*` passes through (routes answer 401 JSON themselves instead of a login redirect)
+
+## [Stage 1] — 2026-07-19 — authentication (branch `feature/auth-multi-trip`)
 
 ### Added — Supabase SSR magic-link auth, not yet mergeable to `main`
 

@@ -1,27 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
 import { CheckIcon, MapPinIcon } from "@/components/icons";
 import { CardSkeleton } from "@/components/Skeleton";
 import { EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
-import { useIdentity } from "@/hooks/useIdentity";
 import { useTripData } from "@/hooks/useTripData";
-import { addEqualExpense } from "@/lib/queries";
+import { addExpense } from "@/lib/queries";
 
 type SplitMode = "everyone" | "custom";
 
 const PAYMENT_SUGGESTIONS = ["Cash", "GPay", "PhonePe", "Paytm"];
 
 /**
- * Manual Add Expense form. Calls the existing `add_equal_expense()` RPC,
- * which owns the split math — this form only collects and validates input.
+ * Manual Add Expense form. Calls the `add_expense()` RPC, which owns the
+ * split math and membership validation — this form only collects input.
  */
 export default function AddExpensePage() {
   const router = useRouter();
   const { status, data, error, refresh } = useTripData();
-  const identity = useIdentity();
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -35,16 +33,8 @@ export default function AddExpensePage() {
   const [submitting, setSubmitting] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
 
-  // Default payer = this device's identity, unless overridden by a tap.
-  const defaultPaidById = useMemo(() => {
-    if (!identity) return null;
-    return (
-      data?.members.find(
-        (m) => m.name.toLowerCase() === identity.toLowerCase(),
-      )?.id ?? null
-    );
-  }, [identity, data?.members]);
-  const paidById = paidByOverride ?? defaultPaidById;
+  // Default payer = the signed-in user's member, unless overridden by a tap.
+  const paidById = paidByOverride ?? data?.myMemberId ?? null;
 
   useEffect(() => {
     if (!succeeded) return;
@@ -91,19 +81,15 @@ export default function AddExpensePage() {
       return;
     }
 
-    const participantNames = participantIds
-      .map((id) => data.members.find((m) => m.id === id)?.name)
-      .filter((name): name is string => Boolean(name));
-
     setFormError(null);
     setSubmitting(true);
     try {
-      await addEqualExpense({
+      await addExpense({
         tripId: data.trip.id,
-        paidByName: payer.name,
+        paidById: payer.id,
         amount: amountValue,
         description: trimmedDescription,
-        participantNames,
+        participantIds,
         paymentApp: paymentApp.trim() || null,
         paidAt: new Date(),
         locationName: locationName.trim() || null,
@@ -154,7 +140,7 @@ export default function AddExpensePage() {
         <EmptyState
           emoji="🧳"
           title="No active trip"
-          message="Start a trip in Supabase before logging an expense here."
+          message="Create a trip first, then log your expenses here."
         />
       </div>
     );

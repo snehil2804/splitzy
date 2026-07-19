@@ -1,20 +1,26 @@
 import { expenseEmoji } from "./emoji";
 import { getSupabase } from "./supabase";
 import type {
-  AddEqualExpenseInput,
+  AddExpenseInput,
   Expense,
   ExpenseRow,
-  MemberRow,
+  Invitation,
+  InvitationRow,
+  Member,
+  Profile,
+  ProfileRow,
   TripData,
+  TripMemberRow,
   TripRow,
 } from "./types";
 
 /**
- * The only file that talks to Supabase. Queries follow the existing backend
- * schema exactly — see SETUP.md "Database contract" for the full shape.
+ * The only file that talks to Supabase. All reads are RLS-scoped to the
+ * signed-in user's trip memberships; all writes go through SECURITY DEFINER
+ * RPCs (validation lives in Postgres, never duplicated here).
  */
 
-/** `trips.status` value that marks the trip currently in progress. */
+/** `trips.status` value that marks a trip currently in progress. */
 const TRIP_ACTIVE_STATUS = "active";
 
 /** Recorded as `expenses.deletion_reason` for deletes made from this app. */
@@ -49,47 +55,83 @@ function mapExpense(row: ExpenseRow): Expense {
   };
 }
 
-export async function fetchTripData(): Promise<TripData> {
+/**
+ * Loads everything the app needs for one render: the user's trips, the
+ * selected trip's active members (via `trip_members` — membership is
+ * per-trip now), and its live expenses. `selectedTripId` comes from the trip
+ * switcher; falls back to the active trip, then the newest.
+ */
+export async function fetchTripData(
+  selectedTripId: string | null,
+): Promise<TripData> {
   const supabase = getSupabase();
 
-  const [membersRes, tripsRes, expensesRes] = await Promise.all([
-    supabase.from("members").select("*").eq("is_active", true).order("name"),
+  const [{ data: sessionData }, tripsRes] = await Promise.all([
+    supabase.auth.getSession(),
     supabase.from("trips").select("*").order("created_at", { ascending: false }),
-    supabase
-      .from("expenses")
-      .select("*, expense_participants(*)")
-      .is("deleted_at", null)
-      .order("paid_at", { ascending: false }),
   ]);
+  if (tripsRes.error) throw new Error(tripsRes.error.message);
+  const userId = sessionData.session?.user.id ?? null;
 
-  const firstError = membersRes.error ?? tripsRes.error ?? expensesRes.error;
-  if (firstError) throw new Error(firstError.message);
-
-  const members = (membersRes.data as MemberRow[]).map((m) => ({
-    id: m.id,
-    name: m.name,
-  }));
-
-  // The trip whose status is "active"; fall back to the newest trip so the
-  // app still works between trips.
   const tripRows = tripsRes.data as TripRow[];
+  const trips = tripRows.map((t) => ({ id: t.id, name: t.name, status: t.status }));
+
   const tripRow =
-    tripRows.find((t) => t.status === TRIP_ACTIVE_STATUS) ?? tripRows[0];
+    tripRows.find((t) => t.id === selectedTripId) ??
+    tripRows.find((t) => t.status === TRIP_ACTIVE_STATUS) ??
+    tripRows[0];
   const trip = tripRow
     ? { id: tripRow.id, name: tripRow.name, status: tripRow.status }
     : null;
 
-  const expenses = (expensesRes.data as ExpenseRow[])
-    .filter((row) => !trip || row.trip_id === trip.id)
-    .map(mapExpense);
+  if (!trip) {
+    return { trips, trip: null, members: [], myMemberId: null, myRole: null, expenses: [] };
+  }
 
-  return { members, trip, expenses };
+  const [membersRes, expensesRes] = await Promise.all([
+    supabase
+      .from("trip_members")
+      .select("*, members(*)")
+      .eq("trip_id", trip.id)
+      .eq("is_active", true),
+    supabase
+      .from("expenses")
+      .select("*, expense_participants(*)")
+      .eq("trip_id", trip.id)
+      .is("deleted_at", null)
+      .order("paid_at", { ascending: false }),
+  ]);
+  const firstError = membersRes.error ?? expensesRes.error;
+  if (firstError) throw new Error(firstError.message);
+
+  const members: Member[] = (membersRes.data as TripMemberRow[])
+    .filter((tm) => tm.members)
+    .map((tm) => ({
+      id: tm.members!.id,
+      name: tm.members!.name,
+      userId: tm.members!.user_id,
+      role: tm.role,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const mine = userId ? members.find((m) => m.userId === userId) : undefined;
+
+  const expenses = (expensesRes.data as ExpenseRow[]).map(mapExpense);
+
+  return {
+    trips,
+    trip,
+    members,
+    myMemberId: mine?.id ?? null,
+    myRole: mine?.role ?? null,
+    expenses,
+  };
 }
 
 /**
  * Soft delete: stamps `deleted_at` / `deleted_by` / `deletion_reason`.
- * `deletedById` is the member using this device (null when identity is
- * unset in Settings).
+ * RLS restricts this to members of the expense's trip, and a column-level
+ * grant keeps every business column unwritable.
  */
 export async function softDeleteExpense(
   expenseId: string,
@@ -108,30 +150,157 @@ export async function softDeleteExpense(
 }
 
 /**
- * Adds an expense via `POST /api/expenses`, which calls the existing
- * `add_equal_expense()` Postgres function server-side (that RPC is
- * service_role-only — the browser has no privilege to call it directly).
- * The split math, paise rounding, and participant validation all still live
- * exclusively in that Postgres function. Returns the new expense's id.
+ * Adds an expense via the `add_expense()` RPC (SECURITY DEFINER). The RPC
+ * validates trip membership for caller, payer, and every participant, and
+ * owns the paise-exact split math. Returns the new expense's id.
  */
-export async function addEqualExpense(
-  input: AddEqualExpenseInput,
-): Promise<string> {
-  const res = await fetch("/api/expenses", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      tripId: input.tripId,
-      paidByName: input.paidByName,
-      amount: input.amount,
-      description: input.description,
-      participantNames: input.participantNames,
-      paymentApp: input.paymentApp,
-      paidAt: input.paidAt.toISOString(),
-      locationName: input.locationName,
-    }),
+export async function addExpense(input: AddExpenseInput): Promise<string> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc("add_expense", {
+    p_trip_id: input.tripId,
+    p_paid_by: input.paidById,
+    p_amount: input.amount,
+    p_description: input.description,
+    p_participant_ids: input.participantIds,
+    p_payment_app: input.paymentApp,
+    p_paid_at: input.paidAt.toISOString(),
+    p_location_name: input.locationName,
   });
-  const body = (await res.json()) as { expenseId?: string; error?: string };
-  if (!res.ok) throw new Error(body.error ?? "Couldn't add that expense.");
-  return body.expenseId as string;
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+// ── Trip management ──────────────────────────────────────────────────────────
+
+export async function createTrip(name: string): Promise<string> {
+  const { data, error } = await getSupabase().rpc("create_trip", {
+    p_name: name,
+  });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+/** Owner-only via RLS; the column grant limits what can change. */
+export async function renameTrip(tripId: string, name: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("trips")
+    .update({ name })
+    .eq("id", tripId);
+  if (error) throw new Error(error.message);
+}
+
+export async function setTripStatus(
+  tripId: string,
+  status: "active" | "completed" | "archived",
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from("trips")
+    .update({ status })
+    .eq("id", tripId);
+  if (error) throw new Error(error.message);
+}
+
+// ── Member management (owner-only, enforced inside each RPC) ────────────────
+
+export async function addGuestMember(
+  tripId: string,
+  name: string,
+): Promise<string> {
+  const { data, error } = await getSupabase().rpc("add_guest_member", {
+    p_trip_id: tripId,
+    p_name: name,
+  });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+export async function inviteMember(
+  tripId: string,
+  email: string,
+  memberId: string | null,
+): Promise<void> {
+  const { error } = await getSupabase().rpc("invite_member", {
+    p_trip_id: tripId,
+    p_email: email,
+    p_member_id: memberId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function revokeInvitation(invitationId: string): Promise<void> {
+  const { error } = await getSupabase().rpc("revoke_invitation", {
+    p_invitation_id: invitationId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function setMemberActive(
+  tripId: string,
+  memberId: string,
+  active: boolean,
+): Promise<void> {
+  const { error } = await getSupabase().rpc("set_trip_member_active", {
+    p_trip_id: tripId,
+    p_member_id: memberId,
+    p_active: active,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchInvitations(tripId: string): Promise<Invitation[]> {
+  const { data, error } = await getSupabase()
+    .from("invitations")
+    .select("*")
+    .eq("trip_id", tripId)
+    .eq("status", "pending")
+    .order("created_at");
+  if (error) throw new Error(error.message);
+  return (data as InvitationRow[]).map((row) => ({
+    id: row.id,
+    email: row.email,
+    memberId: row.member_id,
+    role: row.role,
+    status: row.status,
+  }));
+}
+
+/**
+ * Accepts every pending invitation addressed to the signed-in email —
+ * called once after login so invited users land in their trips (and claim
+ * their pre-auth guest member identity) automatically.
+ */
+export async function acceptMyInvitations(): Promise<number> {
+  const { data, error } = await getSupabase().rpc("accept_my_invitations");
+  if (error) throw new Error(error.message);
+  return (data as number) ?? 0;
+}
+
+// ── Profile ──────────────────────────────────────────────────────────────────
+
+export async function fetchMyProfile(): Promise<Profile | null> {
+  const supabase = getSupabase();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  if (!userId) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const row = data as ProfileRow;
+  return { id: row.id, email: row.email, displayName: row.display_name };
+}
+
+export async function updateDisplayName(displayName: string): Promise<void> {
+  const supabase = getSupabase();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  if (!userId) throw new Error("Not signed in.");
+  const { error } = await supabase
+    .from("profiles")
+    .update({ display_name: displayName })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
 }

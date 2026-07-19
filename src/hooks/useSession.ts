@@ -36,6 +36,25 @@ function subscribe(listener: () => void) {
 const getSnapshot = () => state;
 const getServerSnapshot = (): SessionState => ({ status: "loading", session: null });
 
+let invitationsChecked = false;
+
+/**
+ * Once per app load, accept any pending invitations addressed to this email
+ * (claims the targeted guest member and joins its trips), then refresh trip
+ * data if anything was accepted. Import is dynamic to avoid a module cycle
+ * (queries → supabase ← useSession).
+ */
+async function checkInvitations() {
+  if (invitationsChecked) return;
+  invitationsChecked = true;
+  try {
+    const { acceptMyInvitations } = await import("@/lib/queries");
+    await acceptMyInvitations();
+  } catch {
+    // Non-fatal: the user just won't see the invited trip until next load.
+  }
+}
+
 function init() {
   if (initialized || !isSupabaseConfigured) return;
   initialized = true;
@@ -46,9 +65,11 @@ function init() {
       status: data.session ? "authenticated" : "unauthenticated",
       session: data.session,
     });
+    if (data.session) void checkInvitations();
   });
   supabase.auth.onAuthStateChange((_event, session) => {
     setState({ status: session ? "authenticated" : "unauthenticated", session });
+    if (session) void checkInvitations();
   });
 }
 

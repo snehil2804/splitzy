@@ -5,14 +5,14 @@ import { Avatar } from "@/components/Avatar";
 import { SettlementList } from "@/components/SettlementList";
 import { CardSkeleton } from "@/components/Skeleton";
 import { EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
-import { useIdentity } from "@/hooks/useIdentity";
 import { useTripData } from "@/hooks/useTripData";
 import { computeBalances, computeSettlements } from "@/lib/balances";
 import { formatINR } from "@/lib/format";
 
 export default function BalancesPage() {
   const { status, data, error, refresh } = useTripData();
-  const identity = useIdentity();
+  const myName =
+    data?.members.find((m) => m.id === data.myMemberId)?.name ?? null;
 
   const derived = useMemo(() => {
     if (!data) return null;
@@ -55,9 +55,7 @@ export default function BalancesPage() {
               <section className="space-y-3">
                 {derived.balances.map((balance, i) => {
                   const settled = Math.abs(balance.net) < 1;
-                  const isYou =
-                    identity != null &&
-                    balance.member.name.toLowerCase() === identity.toLowerCase();
+                  const isYou = balance.member.id === data.myMemberId;
                   return (
                     <article
                       key={balance.member.id}
@@ -123,7 +121,7 @@ export default function BalancesPage() {
                 </h2>
                 <SettlementList
                   settlements={derived.settlements}
-                  identity={identity}
+                  identity={myName}
                 />
               </section>
             </>
