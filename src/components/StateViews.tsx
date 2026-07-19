@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { RefreshIcon } from "./icons";
 
 /** Friendly empty / error / not-configured screens — never a blank page. */
@@ -51,6 +52,41 @@ export function ErrorState({
         <RefreshIcon className="size-4" />
         Try again
       </button>
+    </div>
+  );
+}
+
+/**
+ * Signed in, but RLS found no trip this account belongs to — distinct from
+ * `ErrorState` because retrying alone won't fix it; the fix is joining or
+ * creating a trip.
+ */
+export function AccessDeniedState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="anim-fade-up flex flex-col items-center gap-3 px-6 py-14 text-center">
+      <div className="grid size-20 place-items-center rounded-[2rem] bg-brand-soft text-4xl">
+        🔒
+      </div>
+      <h2 className="text-lg font-semibold">Not on a trip yet</h2>
+      <p className="max-w-xs text-sm leading-relaxed text-ink-muted">
+        Your account isn&apos;t linked to any trip. Ask a trip owner to invite
+        you, or create your own.
+      </p>
+      <div className="mt-1 flex items-center gap-2">
+        <Link
+          href="/trips"
+          className="tap inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/25"
+        >
+          Go to trips
+        </Link>
+        <button
+          onClick={onRetry}
+          className="tap inline-flex items-center gap-2 rounded-full bg-line/60 px-5 py-2.5 text-sm font-semibold"
+        >
+          <RefreshIcon className="size-4" />
+          Retry
+        </button>
+      </div>
     </div>
   );
 }

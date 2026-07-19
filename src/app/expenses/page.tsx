@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { ExpenseCard } from "@/components/ExpenseCard";
 import { ListSkeleton } from "@/components/Skeleton";
-import { EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
+import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
 import { useTripData } from "@/hooks/useTripData";
 import { totalSpent } from "@/lib/balances";
 import { dayKey, formatDayLabel, formatINR } from "@/lib/format";
@@ -71,6 +71,7 @@ export default function ExpensesPage() {
       {status === "unconfigured" && <SetupNotice />}
       {status === "loading" && <ListSkeleton count={6} />}
       {status === "error" && <ErrorState message={error ?? ""} onRetry={refresh} />}
+      {status === "forbidden" && <AccessDeniedState onRetry={refresh} />}
 
       {status === "ready" && days.length === 0 && (
         <EmptyState

@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
 import { CheckIcon, MapPinIcon } from "@/components/icons";
 import { CardSkeleton } from "@/components/Skeleton";
-import { EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
+import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
 import { useTripData } from "@/hooks/useTripData";
 import { addExpense } from "@/lib/queries";
 
@@ -129,6 +129,15 @@ export default function AddExpensePage() {
       <div className="space-y-6">
         <Header />
         <ErrorState message={error ?? ""} onRetry={refresh} />
+      </div>
+    );
+  }
+
+  if (status === "forbidden") {
+    return (
+      <div className="space-y-6">
+        <Header />
+        <AccessDeniedState onRetry={refresh} />
       </div>
     );
   }

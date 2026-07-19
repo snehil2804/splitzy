@@ -7,7 +7,7 @@ import { ExpenseCard } from "@/components/ExpenseCard";
 import { ChevronRightIcon, PlusIcon, ScaleIcon } from "@/components/icons";
 import { SettlementList } from "@/components/SettlementList";
 import { CardSkeleton, ListSkeleton, Skeleton } from "@/components/Skeleton";
-import { EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
+import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
 import { useTripData } from "@/hooks/useTripData";
 import { computeBalances, computeSettlements, totalSpent } from "@/lib/balances";
 import { formatINR, greetingForHour } from "@/lib/format";
@@ -74,6 +74,8 @@ export default function DashboardPage() {
       )}
 
       {status === "error" && <ErrorState message={error ?? ""} onRetry={refresh} />}
+
+      {status === "forbidden" && <AccessDeniedState onRetry={refresh} />}
 
       {status === "ready" && data && !data.trip && (
         <EmptyState

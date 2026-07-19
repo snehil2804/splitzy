@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { isPermissionError } from "@/lib/errors";
 import { fetchTripData, softDeleteExpense } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import type { TripData } from "@/lib/types";
@@ -12,7 +13,13 @@ import { getSelectedTripId, useSelectedTripId } from "./useSelectedTrip";
  * Keyed by the selected trip — switching trips forces a fresh load.
  */
 
-export type TripDataStatus = "loading" | "ready" | "error" | "unconfigured";
+export type TripDataStatus =
+  | "loading"
+  | "ready"
+  | "error"
+  /** RLS/grant denial: signed in, but not a member of any visible trip. */
+  | "forbidden"
+  | "unconfigured";
 
 interface StoreState {
   status: TripDataStatus;
@@ -65,10 +72,9 @@ async function load(force = false): Promise<void> {
       setState({ status: "ready", data, error: null });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong";
+      const status: TripDataStatus = isPermissionError(message) ? "forbidden" : "error";
       setState(
-        state.data && sameTrip
-          ? { error: message }
-          : { status: "error", error: message },
+        state.data && sameTrip ? { error: message } : { status, error: message },
       );
     } finally {
       inflight = null;

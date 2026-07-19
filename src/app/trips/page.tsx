@@ -196,6 +196,47 @@ export default function TripsPage() {
       </div>
     );
   }
+  if (status === "forbidden") {
+    // RLS denies reads until you're on a trip — but creating one doesn't
+    // depend on reading trip data, so this stays usable rather than
+    // routing a not-yet-a-member user through AccessDeniedState's
+    // "Go to trips" link, which would just land back here.
+    return (
+      <div className="space-y-6">
+        <Header />
+        <section className="anim-fade-up glass rounded-3xl p-5">
+          <h2 className="text-sm font-semibold">Start your first trip</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            You&apos;re not on any trip yet. Create one, or ask an existing
+            trip&apos;s owner to invite you by email.
+          </p>
+          <form onSubmit={handleCreateTrip} className="mt-4 flex gap-2">
+            <input
+              type="text"
+              value={newTripName}
+              onChange={(e) => setNewTripName(e.target.value)}
+              placeholder="New trip name"
+              maxLength={80}
+              className="min-h-12 w-full rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-brand"
+            />
+            <button
+              type="submit"
+              disabled={creating || !newTripName.trim()}
+              aria-label="Create trip"
+              className="tap grid size-12 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+            >
+              <PlusIcon className="size-5" strokeWidth={2.4} />
+            </button>
+          </form>
+          {formError && (
+            <p className="anim-fade-in mt-3 rounded-2xl bg-negative/10 p-3 text-center text-sm font-medium text-negative">
+              {formError}
+            </p>
+          )}
+        </section>
+      </div>
+    );
+  }
   if (!data) return null;
 
   const unclaimedMembers = data.members.filter((m) => !m.userId);

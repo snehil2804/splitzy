@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Avatar } from "@/components/Avatar";
 import { SettlementList } from "@/components/SettlementList";
 import { CardSkeleton } from "@/components/Skeleton";
-import { EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
+import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
 import { useTripData } from "@/hooks/useTripData";
 import { computeBalances, computeSettlements } from "@/lib/balances";
 import { formatINR } from "@/lib/format";
@@ -40,6 +40,7 @@ export default function BalancesPage() {
       )}
 
       {status === "error" && <ErrorState message={error ?? ""} onRetry={refresh} />}
+      {status === "forbidden" && <AccessDeniedState onRetry={refresh} />}
 
       {status === "ready" && data && derived && (
         <>
