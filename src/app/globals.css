@@ -1,26 +1,186 @@
 @import "tailwindcss";
 
+/* Manual theme switching: `data-theme` is stamped on <html> before paint. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --canvas: #f5f4fb;
+  --surface: rgba(255, 255, 255, 0.66);
+  --surface-strong: #ffffff;
+  --ink: #17131f;
+  --ink-muted: #5f5873;
+  --ink-faint: #8d86a3;
+  --line: rgba(23, 19, 31, 0.08);
+  --brand: #6c5bff;
+  --brand-soft: rgba(108, 91, 255, 0.12);
+  --accent: #ec4899;
+  --positive: #059669;
+  --negative: #e11d48;
+  --glow-a: rgba(124, 91, 255, 0.16);
+  --glow-b: rgba(236, 72, 153, 0.1);
+}
+
+[data-theme="dark"] {
+  --canvas: #0b0a12;
+  --surface: rgba(30, 27, 44, 0.55);
+  --surface-strong: #191627;
+  --ink: #f2f0fa;
+  --ink-muted: #a49dbb;
+  --ink-faint: #6f6889;
+  --line: rgba(255, 255, 255, 0.08);
+  --brand: #8b7bff;
+  --brand-soft: rgba(139, 123, 255, 0.16);
+  --accent: #f472b6;
+  --positive: #34d399;
+  --negative: #fb7185;
+  --glow-a: rgba(124, 91, 255, 0.2);
+  --glow-b: rgba(236, 72, 153, 0.12);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum";
+  overscroll-behavior-y: none;
+}
+
+/* Ambient background glow behind the whole app */
+.app-glow {
+  background:
+    radial-gradient(42rem 42rem at 85% -10%, var(--glow-a), transparent 60%),
+    radial-gradient(36rem 36rem at -15% 30%, var(--glow-b), transparent 60%);
+}
+
+/* Frosted glass card */
+.glass {
+  background: var(--surface);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(23, 19, 31, 0.04), 0 12px 32px -16px rgba(23, 19, 31, 0.14);
+}
+
+[data-theme="dark"] .glass {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -20px rgba(0, 0, 0, 0.6);
+}
+
+/* Pressable: subtle scale-down on touch */
+.tap {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.tap:active {
+  transform: scale(0.97);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.anim-fade-up {
+  animation: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.anim-fade-in {
+  animation: fade-in 0.25s ease both;
+}
+
+.anim-sheet-up {
+  animation: sheet-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.anim-float {
+  animation: float 3.5s ease-in-out infinite;
+}
+
+.skeleton {
+  background: linear-gradient(
+    100deg,
+    var(--line) 40%,
+    var(--surface-strong) 50%,
+    var(--line) 60%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

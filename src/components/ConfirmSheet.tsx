@@ -1,0 +1,77 @@
+"use client";
+
+import { useEffect } from "react";
+
+interface ConfirmSheetProps {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+/** iOS-style bottom action sheet for destructive confirmations. */
+export function ConfirmSheet({
+  open,
+  title,
+  message,
+  confirmLabel,
+  busy = false,
+  onConfirm,
+  onCancel,
+}: ConfirmSheetProps) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open, onCancel]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <button
+        aria-label="Cancel"
+        onClick={onCancel}
+        className="anim-fade-in absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+      />
+      <div className="anim-sheet-up glass relative m-3 w-full max-w-sm rounded-[2rem] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line" />
+        <h2 className="text-center text-lg font-semibold">{title}</h2>
+        <p className="mt-1.5 text-center text-sm leading-relaxed text-ink-muted">
+          {message}
+        </p>
+        <div className="mt-6 grid gap-2.5">
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="tap rounded-2xl bg-negative py-3.5 text-sm font-semibold text-white shadow-lg shadow-negative/25 disabled:opacity-60"
+          >
+            {busy ? "Deleting…" : confirmLabel}
+          </button>
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="tap rounded-2xl bg-line py-3.5 text-sm font-semibold"
+          >
+            Keep it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

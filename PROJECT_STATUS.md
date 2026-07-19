@@ -1,0 +1,163 @@
+# Project Status
+
+_Last updated: 2026-07-19 (real credentials in place — READY FOR DEPLOYMENT)_
+
+## ✅ Completed
+
+- [x] Supabase project, schema, relationships, `add_equal_expense()`, balance functions (backend, pre-existing)
+- [x] Next.js 16 + TypeScript + Tailwind v4 foundation; all starter boilerplate removed
+- [x] Design system: semantic tokens, glassmorphism, light/dark themes, no-flash theme script
+- [x] Static-shell rendering — every route prerendered, single runtime dependency
+- [x] Data layer: typed queries, SWR-style shared cache, optimistic soft delete with rollback
+- [x] Client-side balance + greedy settlement math
+- [x] Dashboard: greeting, trip summary, animated total, your balance, settlements, recent expenses, quick actions
+- [x] Expenses: day-grouped list, emoji, payer, participants, time, location, staggered animations
+- [x] Delete flow: bottom-sheet confirmation → soft delete → balances auto-update
+- [x] Balances: paid / share / net per member + settlement recommendations ("Shruti → Snehil ₹650")
+- [x] Settings: identity picker ("who are you?"), Auto/Light/Dark theme, trip info, about
+- [x] Manual Add Expense form: description, amount, payer, split (everyone / choose people), optional payment app + location, calling `add_equal_expense()`; validates inputs client-side, refreshes shared trip data on success
+- [x] Loading skeletons, empty states, error states, Supabase-not-configured state
+- [x] PWA-ready: manifest, generated app icons, theme-color, safe-area insets
+- [x] `.env.local.example`; lint, typecheck and production build all green
+- [x] Documentation suite (README, CLAUDE, ARCHITECTURE, UI_GUIDELINES, SETUP, ROADMAP, CHANGELOG)
+
+- [x] Database reconciliation: queries aligned with the real schema (`paid_at`, `status='active'` trip selection, `is_active` members, `location_name`/`payment_app`, `deleted_by`/`deletion_reason` on soft delete, `share_amount`/`share_per_person` fallbacks)
+- [x] Confirmed against the live production database (read-only check via Supabase MCP): correct project, all 5 expected public tables present, `add_equal_expense(p_trip_id uuid, p_paid_by_name text, p_amount numeric, p_description text, p_participant_names text[], p_payment_app text, p_paid_at timestamptz, p_latitude numeric, p_longitude numeric, p_location_name text) returns uuid` exists with this exact signature
+- [x] `addEqualExpense()` in `queries.ts` finalized with strict types (`AddEqualExpenseInput`) and the real RPC parameter names
+- [x] Discovered `add_equal_expense()` is **`service_role`-only** in production (no `EXECUTE` for `anon`/`authenticated`) — re-architected the write path: `.env.local` created (placeholders) with `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY`; added `src/lib/supabase-server.ts` (secret-key client) and `POST /api/expenses` (validates the request, then calls the RPC server-side); `addEqualExpense()` in `queries.ts` now calls that route instead of the RPC directly. Verified the secret key never reaches the client bundle (`grep` over `.next/static` after `npm run build`: zero matches). `lint`, `tsc --noEmit`, and `build` all green.
+- [x] Confirmed `trips.status` uses the literal value `'active'` on live data — the `trips` CHECK constraint restricts it to `'active' | 'completed' | 'archived'`, and the post-migration `anon`-role smoke test below found exactly 1 row with `status = 'active'` ("Default Trip").
+- [x] **Applied to production (2026-07-19) and fully verified**: RLS SELECT policies on all 5 tables + a column-scoped `anon` UPDATE on `expenses` (soft-delete columns only). See "Applied" section below for the exact results of every verification query, plus a live `anon`-role read smoke test. Migration name: `anon_select_policies_and_expenses_softdelete_column_grant`.
+- [x] **Final production-readiness review (2026-07-19), after real credentials were pasted into `.env.local` and the dev server restarted**: `npx tsc --noEmit` (no `typecheck` script exists in `package.json`; this is the direct equivalent), `npm run lint`, and `npm run build` all clean; `/api/expenses` still builds as `ƒ` (dynamic), everything else `○` (static). Verdict: **READY FOR DEPLOYMENT** — see the "Final review" section below for the full result set. No env-var values were displayed, logged, or read aloud at any point in this pass.
+
+## ✅ Applied & verified: RLS + column-privilege hardening (2026-07-19)
+
+Production had RLS **enabled** on all 5 public tables with **zero policies** — `anon` got zero rows on every read despite holding table-level grants. This is now fixed. The exact SQL that was reviewed, approved, and executed:
+
+```sql
+-- Idempotent — RLS is already enabled on all 5, included for completeness.
+alter table public.members enable row level security;
+alter table public.trips enable row level security;
+alter table public.trip_members enable row level security;
+alter table public.expenses enable row level security;
+alter table public.expense_participants enable row level security;
+
+-- SELECT-only policies for the anon (browser/publishable-key) role.
+create policy "anon_select_members" on public.members
+  for select to anon using (true);
+create policy "anon_select_trips" on public.trips
+  for select to anon using (true);
+create policy "anon_select_trip_members" on public.trip_members
+  for select to anon using (true);
+create policy "anon_select_expenses" on public.expenses
+  for select to anon using (true);
+create policy "anon_select_expense_participants" on public.expense_participants
+  for select to anon using (true);
+
+-- RLS UPDATE policy for anon on expenses only — controls which ROWS may be
+-- updated (all of them; there's no per-user ownership model). This alone
+-- does NOT protect business columns: RLS restricts rows, never columns.
+-- The column-level GRANT below is what actually does that.
+create policy "anon_update_expenses" on public.expenses
+  for update to anon using (true) with check (true);
+
+-- Table-level SELECT grants (anon already has these; included for idempotency).
+grant select on
+  public.members, public.trips, public.trip_members,
+  public.expenses, public.expense_participants
+to anon;
+
+-- Column-level UPDATE grant — NOT a blanket table grant. `anon` may only
+-- SET these 3 columns, matching exactly what the existing soft-delete flow
+-- sends (softDeleteExpense() in queries.ts). An UPDATE that also touches
+-- amount / paid_by / trip_id / description / payment_app /
+-- participant_count / share_per_person / paid_at / latitude / longitude /
+-- location_name is rejected by Postgres before RLS even runs.
+--
+-- `anon` currently holds a pre-existing BLANKET table-level UPDATE grant
+-- (predates this project) — it must be revoked first, or it would silently
+-- override this narrower grant (Postgres ACLs are additive: the broadest
+-- applicable grant wins).
+revoke update on public.expenses from anon;
+grant update (deleted_at, deleted_by, deletion_reason) on public.expenses to anon;
+```
+
+### Verification results (all read-only, run immediately after applying)
+
+**Policies created** (`pg_policies`, schema `public`) — exactly 6, matching the SQL exactly:
+
+| Table | Policy | Command |
+|---|---|---|
+| `expense_participants` | `anon_select_expense_participants` | SELECT |
+| `expenses` | `anon_select_expenses` | SELECT |
+| `expenses` | `anon_update_expenses` | UPDATE |
+| `members` | `anon_select_members` | SELECT |
+| `trip_members` | `anon_select_trip_members` | SELECT |
+| `trips` | `anon_select_trips` | SELECT |
+
+**Table-level privileges** — `anon` `SELECT` is `true` on all 5 tables. `anon` table-level `UPDATE` on `expenses` reads **`false`** — this turned out to differ from what the earlier draft assumed (`has_table_privilege(...,'update')` was expected to read `true` because *some* column is updatable); in practice Postgres reported `false` here once the blanket grant was revoked and only a column-scoped grant remained. The column-level checks below are the authoritative test either way, and they're exactly right:
+
+**Column-level `UPDATE` privileges on `expenses`** — must be `true` only for the 3 soft-delete columns, `false` for every business column:
+
+| Column | `anon` can UPDATE? |
+|---|---|
+| `deleted_at` | **true** ✅ |
+| `deleted_by` | **true** ✅ |
+| `deletion_reason` | **true** ✅ |
+| `amount` | false ✅ |
+| `paid_by` | false ✅ |
+| `trip_id` | false ✅ |
+| `description` | false ✅ |
+| `payment_app` | false ✅ |
+| `participant_count` | false ✅ |
+| `share_per_person` | false ✅ |
+| `paid_at` | false ✅ |
+| `latitude` | false ✅ |
+| `longitude` | false ✅ |
+| `location_name` | false ✅ |
+
+**`add_equal_expense()` execute privilege for `anon`**: `false` — confirmed still `service_role`-only, unaffected by this migration, exactly as intended.
+
+**Live `anon`-role read smoke test** (ran the actual queries under `SET ROLE anon`, not just privilege introspection — this is what the deployed app will really see):
+
+| Check | Result |
+|---|---|
+| Active trip found | **1** ("Default Trip") |
+| Active members found | **3** |
+| Non-deleted expenses found | **1** |
+| Expense participants accessible | **3** |
+
+No rows were created, updated, or deleted during any of this — every statement above was `SELECT`/introspection only.
+
+**Security implications:**
+- `using (true)` on the SELECT policies makes every row in these 5 tables readable by anyone holding the publishable key — which is not a secret, it's embedded in the shipped JS. Acceptable for a private app used by 3 trusted people with no auth; would need per-user/per-trip scoping if this ever becomes multi-tenant or public.
+- `expenses` gets an `anon` **UPDATE** RLS policy (`using (true) with check (true)`, row-scope only) **plus** a **column-level grant restricted to `deleted_at`, `deleted_by`, `deletion_reason`** — the two together mean `anon` can soft-delete any expense row but literally cannot construct an `UPDATE` statement that touches `amount`, `paid_by`, `trip_id`, `description`, `payment_app`, `participant_count`, `share_per_person`, `paid_at`, `latitude`, `longitude`, or `location_name`; Postgres rejects the entire statement at the privilege-check stage if it tries. This replaces the earlier draft's blanket `WITH CHECK (true)`, which relied on RLS alone and left every business column writable.
+- Column-level grants don't validate *values* (e.g. they can't require `deletion_reason` to be non-empty) — not a new gap, since the app-level validation for those fields already lives in `softDeleteExpense()`/`ConfirmSheet`, not the database.
+- No INSERT or DELETE policy is added anywhere — `add_equal_expense()` stays the only way to create an expense, unreachable by `anon`/`authenticated` (confirmed by the last verification query above), and rows are never hard-deleted.
+- Considered and rejected for now: a `BEFORE UPDATE` trigger (duplicates what the column grant already enforces; worth adding later only as defense-in-depth against a future admin re-broadening the grant) and a `SECURITY DEFINER soft_delete_expense()` function mirroring `add_equal_expense()` (the tightest possible boundary — `anon` would need zero direct table privileges — but requires a new SQL function plus changing `softDeleteExpense()` to call `.rpc()` instead of `.update()`, which changes the app's write path where you asked to keep it unchanged).
+
+## ✅ Final production-readiness review (2026-07-19)
+
+Ran after real credentials were pasted into `.env.local` and the dev server restarted. No environment-variable values were displayed, logged, or read aloud at any point.
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | No such script in `package.json` — ran `npx tsc --noEmit` instead (the direct equivalent): **clean, zero errors** |
+| `npm run lint` | **clean** |
+| `npm run build` | **clean** — `/api/expenses` builds as `ƒ` (dynamic), every other route `○` (static) |
+| Secret/service-role reference in client-side code | **None found.** `SUPABASE_SECRET_KEY` appears only in `src/lib/supabase-server.ts`; its only importer is `src/app/api/expenses/route.ts` (a Route Handler, never client-bundled); a fresh `grep` over `.next/static` after the build found zero matches; a repo-wide grep for `SUPABASE_SECRET_KEY`/`SERVICE_ROLE` outside `node_modules`/`.next` found nothing else; `next.config.ts` has no `env` block re-exposing server vars |
+| `.env.local` excluded from Git | **Confirmed** — matched by `.gitignore`'s `.env*` rule (`git check-ignore -v`); `git ls-files .env.local` returns nothing (never tracked) |
+| Add-expense flow architecture | **Confirmed unchanged**: `addEqualExpense()` (`queries.ts`) → `fetch("/api/expenses")` → `POST` handler (`route.ts`) validates → `getSupabaseServer()` → `supabase.rpc("add_equal_expense", ...)`. Browser never touches the RPC directly |
+| Soft-delete column scope | **Confirmed unchanged**: `softDeleteExpense()` (`queries.ts`) sets exactly `deleted_at`, `deleted_by`, `deletion_reason` — nothing else, matching the column-level grant applied to production |
+| Live dev-server spot check | Local server (port 3777, already running) responds `200` on `/`, page HTML contains no secret-key string; `POST /api/expenses` with a deliberately invalid body correctly returns `400` with a safe message (`"A valid trip is required."`) — validated before ever reaching Supabase, so no DB write occurred |
+| Database policy / production data changes this pass | **None** — no blocker was found that would justify one |
+
+**Not yet done (not blockers, just not verified in this pass):** a full interactive browser walkthrough (loading the real dashboard/expenses/balances data, adding a real expense end-to-end, exercising delete) hasn't been driven from a browser — the underlying DB permissions were already confirmed via the `anon`-role smoke test in the prior session (1 active trip, 3 members, 1 expense, 3 participants all visible), and this pass's dev-server spot check confirms the server boots and validates correctly with the real credentials now in place.
+
+## 📋 Remaining
+
+- [ ] Manual/visual walkthrough of the running app against live data (dashboard, expenses, balances, add-expense, delete) — recommended before considering the feature fully done, though not a deployment blocker
+- [ ] Add the same 3 env vars to Vercel (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) before deploying there — see SETUP.md
+- [ ] Visual pass on a real iPhone (safe areas, standalone PWA mode)
+- [ ] Apple Shortcut → Edge Function pipeline (Phases 3–4, see ROADMAP.md)
+- [ ] Optional: Supabase Realtime subscription so expenses appear live
+- [ ] Optional: service worker for offline reads
