@@ -1,17 +1,21 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { ExpenseCard } from "@/components/ExpenseCard";
 import { ListSkeleton } from "@/components/Skeleton";
 import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
+import { useSession } from "@/hooks/useSession";
 import { useTripData } from "@/hooks/useTripData";
 import { totalSpent } from "@/lib/balances";
 import { dayKey, formatDayLabel, formatINR } from "@/lib/format";
 import type { Expense } from "@/lib/types";
 
 export default function ExpensesPage() {
+  const router = useRouter();
   const { status, data, error, refresh, deleteExpense } = useTripData();
+  const { session } = useSession();
   const [pendingDelete, setPendingDelete] = useState<Expense | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -20,6 +24,10 @@ export default function ExpensesPage() {
     () => new Map((data?.members ?? []).map((m) => [m.id, m])),
     [data?.members],
   );
+
+  const myUserId = session?.user.id ?? null;
+  const canEdit = (expense: Expense) =>
+    data?.myRole === "owner" || (myUserId !== null && expense.createdBy === myUserId);
 
   /** Expenses grouped by calendar day, newest day first. */
   const days = useMemo(() => {
@@ -94,6 +102,11 @@ export default function ExpensesPage() {
                   expense={expense}
                   membersById={membersById}
                   onDelete={setPendingDelete}
+                  onEdit={
+                    canEdit(expense)
+                      ? (e) => router.push(`/add?edit=${e.id}`)
+                      : undefined
+                  }
                   index={i}
                 />
               ))}

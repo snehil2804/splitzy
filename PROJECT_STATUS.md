@@ -1,6 +1,18 @@
 # Project Status
 
-_Last updated: 2026-07-20 (invitations + inbox on `feature/invitations`, not merged)_
+_Last updated: 2026-07-20 (Stage 3 — trip lifecycle, expense splits, balances & settlements — on `feature/trip-expense-engine`, not merged)_
+
+## 💰 Stage 3: trip lifecycle, expense splits, balances & settlements (branch `feature/trip-expense-engine`)
+
+Financial-engine stage: 4 expense split methods (equal/exact/percentage/shares), creator-or-owner edit/delete permissions, full trip lifecycle (transfer ownership, leave, hard delete), settlement recording with an optimized minimum-transaction algorithm, and an immutable activity feed. See CHANGELOG "Unreleased" for the complete change list; the CLAUDE.md "Stage 3 financial engine" bullet has the architecture summary.
+
+**Reuse-first**: audited the existing implementation before writing anything (per explicit instruction) — activity logging went in as DB triggers specifically so no already-tested RPC (`create_trip`, `set_trip_member_role`, `claim_invitation`, etc.) needed touching; equal/exact/percentage/shares all funnel through one `compute_expense_splits()` function rather than four separate implementations.
+
+**Two pre-existing bugs found and fixed while wiring this in** (not new regressions — present before this stage): `computeBalances()` was being called without its `settlements` argument on both the dashboard and `/balances`, so recorded settlements never adjusted the displayed balances; `expenses` had an UPDATE RLS policy that let any trip member soft-delete any other member's expense, tightened to creator-or-owner alongside the new `edit_expense()` permission check.
+
+**Verification**: `npx tsc --noEmit` clean, `npm run lint` clean (0 errors, 0 warnings), `npm test` 31/31 unit (was 20 before this stage — added split-validation edge cases and a settlement-optimization case proving the zero-sum-partition pass beats naive greedy), `npm run test:trip-expense-engine` (new) 38/38 live checks against production, `npm run test:db`/`test:auth`/`test:invitations` re-run clean (17/6/24 — no regressions), `npm run build` clean (18 routes, all static except `/api/expenses`, `/auth/callback`, `/join/[token]`). Grepped `.next/static` for the secret key after the build — zero matches.
+
+**Pushed** to `origin/feature/trip-expense-engine` (`849be12`); Vercel Preview deployed successfully: `https://splitzy-5xt214dz0-snehils-projects-979efd30.vercel.app`. Not merged to `main` — awaiting a human walkthrough of the Preview and explicit approval, same as every prior stage.
 
 ## 📬 Invitations inbox (branch `feature/invitations`)
 
@@ -222,6 +234,7 @@ Before the first push, ran a full security/git audit:
 
 ## 📋 Remaining
 
+- [ ] Human walkthrough of `feature/trip-expense-engine`'s Preview deployment, then merge to `main` with explicit approval (Stage 3 — see the entry at the top of this file)
 - [ ] Add the same 3 env vars to Vercel (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) and import `snehil2804/splitzy` as the Vercel project — see SETUP.md
 - [ ] Manual/visual walkthrough of the running app against live data (dashboard, expenses, balances, add-expense, delete) — recommended before considering the feature fully done, though not a deployment blocker
 - [ ] Visual pass on a real iPhone (safe areas, standalone PWA mode)

@@ -30,7 +30,7 @@ export default function DashboardPage() {
 
   const derived = useMemo(() => {
     if (!data) return null;
-    const balances = computeBalances(data.members, data.expenses);
+    const balances = computeBalances(data.members, data.expenses, data.settlements);
     return {
       balances,
       settlements: computeSettlements(balances),

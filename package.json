@@ -11,7 +11,8 @@
     "test": "tsx --test \"tests/**/*.test.ts\"",
     "test:db": "node --env-file=.env.local scripts/db-e2e.mjs",
     "test:auth": "node --env-file=.env.local scripts/auth-e2e.mjs",
-    "test:invitations": "node --env-file=.env.local scripts/invitations-e2e.mjs"
+    "test:invitations": "node --env-file=.env.local scripts/invitations-e2e.mjs",
+    "test:trip-expense-engine": "node --env-file=.env.local scripts/trip-expense-engine-e2e.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

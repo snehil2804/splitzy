@@ -1,10 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
-import { CheckIcon, LinkIcon, PlusIcon, ShareIcon, WhatsAppIcon } from "@/components/icons";
+import {
+  CheckIcon,
+  ChevronRightIcon,
+  LinkIcon,
+  PlusIcon,
+  ShareIcon,
+  WhatsAppIcon,
+} from "@/components/icons";
 import { CardSkeleton } from "@/components/Skeleton";
 import { ErrorState, SetupNotice } from "@/components/StateViews";
 import { setSelectedTripId } from "@/hooks/useSelectedTrip";
@@ -12,13 +20,17 @@ import { useTripData } from "@/hooks/useTripData";
 import {
   addGuestMember,
   createTrip,
+  deleteTrip,
   fetchInvitations,
   inviteMember,
+  leaveTrip,
   renameTrip,
   revokeInvitation,
   setMemberActive,
   setMemberRole,
   setTripStatus,
+  transferTripOwnership,
+  updateTripDescription,
 } from "@/lib/queries";
 import type { Invitation, Member } from "@/lib/types";
 
@@ -50,6 +62,18 @@ export default function TripsPage() {
     value: string;
   } | null>(null);
   const [renaming, setRenaming] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState<{
+    tripId: string;
+    value: string;
+  } | null>(null);
+  const [savingDescription, setSavingDescription] = useState(false);
+  const [transferTargetId, setTransferTargetId] = useState("");
+  const [transferring, setTransferring] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [pendingDeleteTrip, setPendingDeleteTrip] = useState(false);
+  const [deletingTrip, setDeletingTrip] = useState(false);
+  const [pendingLeave, setPendingLeave] = useState(false);
+  const [leavingTrip, setLeavingTrip] = useState(false);
   const [guestName, setGuestName] = useState("");
   const [inviteMode, setInviteMode] = useState<"existing" | "new">("existing");
   const [inviteMemberId, setInviteMemberId] = useState<string | "">("");
@@ -76,6 +100,10 @@ export default function TripsPage() {
 
   const renameValue =
     renameDraft?.tripId === tripId ? renameDraft.value : (data?.trip?.name ?? "");
+  const descriptionValue =
+    descriptionDraft?.tripId === tripId
+      ? descriptionDraft.value
+      : (data?.trip?.description ?? "");
   const invitations =
     fetchedInvitations?.tripId === tripId ? fetchedInvitations.list : [];
 
@@ -131,6 +159,74 @@ export default function TripsPage() {
       fail(err);
     } finally {
       setRenaming(false);
+    }
+  }
+
+  async function handleSaveDescription(e: FormEvent) {
+    e.preventDefault();
+    if (!tripId) return;
+    setSavingDescription(true);
+    try {
+      await updateTripDescription(tripId, descriptionValue);
+      await refresh();
+      note("Description saved.");
+    } catch (err) {
+      fail(err);
+    } finally {
+      setSavingDescription(false);
+    }
+  }
+
+  async function handleTransferOwnership(e: FormEvent) {
+    e.preventDefault();
+    if (!tripId || !transferTargetId) return;
+    setTransferring(true);
+    try {
+      await transferTripOwnership(tripId, transferTargetId);
+      setTransferTargetId("");
+      await refresh();
+      note("Ownership transferred.");
+    } catch (err) {
+      fail(err);
+    } finally {
+      setTransferring(false);
+    }
+  }
+
+  async function handleDeleteTrip() {
+    if (!tripId) return;
+    setDeletingTrip(true);
+    try {
+      await deleteTrip(tripId);
+      setPendingDeleteTrip(false);
+      setDeleteConfirmText("");
+      setSelectedTripId(null);
+      await refresh();
+      note("Trip deleted.");
+      router.push("/");
+    } catch (err) {
+      fail(err);
+      setPendingDeleteTrip(false);
+    } finally {
+      setDeletingTrip(false);
+    }
+  }
+
+  async function handleLeaveTrip() {
+    if (!tripId) return;
+    setLeavingTrip(true);
+    try {
+      await leaveTrip(tripId);
+      setPendingLeave(false);
+      setSelectedTripId(null);
+      await refresh();
+      note("You left the trip.");
+      router.push("/");
+    } catch (err) {
+      fail(err);
+      setPendingLeave(false);
+    } finally {
+      setLeavingTrip(false);
     }
   }
 
@@ -515,6 +611,32 @@ export default function TripsPage() {
               </div>
 
               <div>
+                <h2 className="text-sm font-semibold">Description</h2>
+                <form onSubmit={handleSaveDescription} className="mt-2 flex gap-2">
+                  <textarea
+                    value={descriptionValue}
+                    onChange={(e) =>
+                      setDescriptionDraft({ tripId: tripId!, value: e.target.value })
+                    }
+                    placeholder="What's this trip about?"
+                    maxLength={280}
+                    rows={2}
+                    className="w-full resize-none rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-brand"
+                  />
+                  <button
+                    type="submit"
+                    disabled={
+                      savingDescription ||
+                      descriptionValue.trim() === (data.trip.description ?? "")
+                    }
+                    className="tap shrink-0 rounded-2xl bg-brand px-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+                  >
+                    Save
+                  </button>
+                </form>
+              </div>
+
+              <div>
                 <h2 className="text-sm font-semibold">
                   {data.trip.status === "active" ? "Archive trip" : "Reactivate trip"}
                 </h2>
@@ -703,8 +825,79 @@ export default function TripsPage() {
                   </ul>
                 )}
               </div>
+
+              <div>
+                <h2 className="text-sm font-semibold">Transfer ownership</h2>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  They become the owner; you become a regular member.
+                </p>
+                <form onSubmit={handleTransferOwnership} className="mt-2 flex gap-2">
+                  <select
+                    value={transferTargetId}
+                    onChange={(e) => setTransferTargetId(e.target.value)}
+                    className="min-h-12 w-full appearance-none rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-brand"
+                  >
+                    <option value="">Choose a member…</option>
+                    {data.members
+                      .filter((m) => m.id !== data.myMemberId && m.userId)
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="submit"
+                    disabled={transferring || !transferTargetId}
+                    className="tap shrink-0 rounded-2xl bg-line px-4 text-sm font-semibold text-ink disabled:opacity-60"
+                  >
+                    Transfer
+                  </button>
+                </form>
+              </div>
+
+              <div className="border-t border-line pt-4">
+                <h2 className="text-sm font-semibold text-negative">Delete trip</h2>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  Permanently removes this trip and every expense, member, and
+                  settlement in it. This cannot be undone.
+                </p>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder={`Type "${data.trip.name}" to confirm`}
+                  className="mt-2 min-h-12 w-full rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-negative"
+                />
+                <button
+                  onClick={() => setPendingDeleteTrip(true)}
+                  disabled={deleteConfirmText.trim() !== data.trip.name}
+                  className="tap mt-2 min-h-12 w-full rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative disabled:opacity-40"
+                >
+                  Delete this trip
+                </button>
+              </div>
             </section>
           )}
+
+          {/* Leave trip: any member, including the owner (blocked server-side
+              if they're the sole owner — must transfer ownership first). */}
+          <section
+            className="anim-fade-up glass rounded-3xl p-5"
+            style={{ animationDelay: "150ms" }}
+          >
+            <h2 className="text-sm font-semibold">Leave trip</h2>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              You&apos;ll lose access to {data.trip.name}. Your past expenses stay.
+            </p>
+            <button
+              onClick={() => setPendingLeave(true)}
+              disabled={!data.myMemberId}
+              className="tap mt-2 min-h-12 w-full rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative disabled:opacity-40"
+            >
+              Leave this trip
+            </button>
+          </section>
         </>
       )}
 
@@ -741,17 +934,52 @@ export default function TripsPage() {
         onConfirm={handleArchiveToggle}
         onCancel={() => setPendingArchive(false)}
       />
+      <ConfirmSheet
+        open={pendingDeleteTrip}
+        title={`Delete ${data?.trip?.name ?? "this trip"}?`}
+        message="This permanently removes the trip and everything in it — expenses, members, invitations, settlements. There's no undo."
+        confirmLabel="Yes, delete permanently"
+        busyLabel="Deleting…"
+        cancelLabel="Cancel"
+        busy={deletingTrip}
+        onConfirm={handleDeleteTrip}
+        onCancel={() => {
+          if (!deletingTrip) setPendingDeleteTrip(false);
+        }}
+      />
+      <ConfirmSheet
+        open={pendingLeave}
+        title={`Leave ${data?.trip?.name ?? "this trip"}?`}
+        message="You'll lose access to this trip's expenses and balances. Your past expenses stay for everyone else."
+        confirmLabel="Yes, leave"
+        busyLabel="Leaving…"
+        cancelLabel="Cancel"
+        busy={leavingTrip}
+        onConfirm={handleLeaveTrip}
+        onCancel={() => {
+          if (!leavingTrip) setPendingLeave(false);
+        }}
+      />
     </div>
   );
 }
 
 function Header() {
   return (
-    <header className="anim-fade-up pt-2">
-      <h1 className="text-2xl font-bold tracking-tight">Trips</h1>
-      <p className="mt-1 text-sm text-ink-muted">
-        Switch trips, invite people, manage members.
-      </p>
+    <header className="anim-fade-up flex items-start justify-between pt-2">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Trips</h1>
+        <p className="mt-1 text-sm text-ink-muted">
+          Switch trips, invite people, manage members.
+        </p>
+      </div>
+      <Link
+        href="/activity"
+        className="tap mt-1 flex items-center gap-0.5 text-xs font-semibold text-brand"
+      >
+        Activity
+        <ChevronRightIcon className="size-3.5" />
+      </Link>
     </header>
   );
 }

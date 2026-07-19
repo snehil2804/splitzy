@@ -63,8 +63,12 @@ export interface ExpenseParticipantRow {
   expense_id: string;
   member_id: string;
   share_amount: number | null;
+  share_percentage: number | null;
+  share_units: number | null;
   created_at: string;
 }
+
+export type SplitType = "equal" | "exact" | "percentage" | "shares";
 
 export interface ExpenseRow {
   id: string;
@@ -84,7 +88,33 @@ export interface ExpenseRow {
   deleted_at: string | null;
   deleted_by: string | null;
   deletion_reason: string | null;
+  created_by: string | null;
+  split_type: SplitType;
+  category: string | null;
+  notes: string | null;
+  currency: string;
   expense_participants: ExpenseParticipantRow[];
+}
+
+export interface SettlementRow {
+  id: string;
+  trip_id: string;
+  from_member_id: string;
+  to_member_id: string;
+  amount: number;
+  note: string | null;
+  settled_by: string | null;
+  created_at: string;
+}
+
+export interface ActivityLogRow {
+  id: string;
+  trip_id: string;
+  actor_member_id: string | null;
+  action: string;
+  description: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
 }
 
 // ── View models ──────────────────────────────────────────────────────────────
@@ -100,6 +130,7 @@ export interface Member {
 export interface Trip {
   id: string;
   name: string;
+  description: string | null;
   status: string;
 }
 
@@ -151,6 +182,12 @@ export interface Expense {
   locationName: string | null;
   /** When the payment happened (`paid_at`), not when the row was created. */
   date: Date;
+  /** Auth user id of whoever logged it; null for pre-Stage-3 rows. */
+  createdBy: string | null;
+  splitType: SplitType;
+  category: string | null;
+  notes: string | null;
+  currency: string;
 }
 
 export interface MemberBalance {
@@ -161,10 +198,29 @@ export interface MemberBalance {
   net: number;
 }
 
+/** A suggested (not yet paid) settlement produced by `computeSettlements()`. */
 export interface Settlement {
   from: Member;
   to: Member;
   amount: number;
+}
+
+/** An actually-recorded settlement, read back from the `settlements` table. */
+export interface SettlementRecord {
+  id: string;
+  fromMemberId: string;
+  toMemberId: string;
+  amount: number;
+  note: string | null;
+  createdAt: Date;
+}
+
+export interface ActivityEntry {
+  id: string;
+  actorMemberId: string | null;
+  action: string;
+  description: string;
+  createdAt: Date;
 }
 
 export interface TripData {
@@ -178,6 +234,18 @@ export interface TripData {
   myMemberId: string | null;
   myRole: "owner" | "member" | null;
   expenses: Expense[];
+  settlements: SettlementRecord[];
+}
+
+/**
+ * One participant's input for a non-equal split: an exact rupee amount, a
+ * percentage, or a share count, depending on the expense's `splitType`.
+ * Ignored entirely for `splitType: "equal"` — the RPC computes that split
+ * from `participantIds` alone.
+ */
+export interface ExpenseSplitInput {
+  memberId: string;
+  value: number;
 }
 
 /**
@@ -194,6 +262,27 @@ export interface AddExpenseInput {
   paymentApp: string | null;
   paidAt: Date;
   locationName: string | null;
+  splitType: SplitType;
+  /** Required for exact/percentage/shares; ignored for equal. */
+  splits: ExpenseSplitInput[] | null;
+  category: string | null;
+  notes: string | null;
+}
+
+/** Input for `editExpense()`. Maps to the `edit_expense()` RPC. */
+export interface EditExpenseInput {
+  expenseId: string;
+  description: string;
+  amount: number;
+  paidById: string;
+  participantIds: string[];
+  paidAt: Date | null;
+  paymentApp: string | null;
+  locationName: string | null;
+  splitType: SplitType;
+  splits: ExpenseSplitInput[] | null;
+  category: string | null;
+  notes: string | null;
 }
 
 /**
