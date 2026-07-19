@@ -1,10 +1,10 @@
 # Project Status
 
-_Last updated: 2026-07-19 (Stage 3 complete on `feature/auth-multi-trip` — verified end-to-end, not merged)_
+_Last updated: 2026-07-19 (**MERGED TO MAIN + DEPLOYED TO PRODUCTION** — `075a0ef`)_
 
-## ⚠️ Important: production (`splitzy-delta.vercel.app`) is knowingly broken until merge
+## ✅ Live in production (`splitzy-delta.vercel.app`)
 
-Production still serves `main` (`aa7b59b`, the pre-auth build). The Stage 2 RLS cutover removed anonymous database access, so that old build now shows "permission denied for table members" — and it greets from the legacy `localStorage["splitzy:identity"]` value (hence "Good evening, Anshul" if Anshul was ever tapped in the old picker). **This is not a bug in the feature branch**; it resolves the moment `feature/auth-multi-trip` merges to `main`. Test only the newest Vercel Preview (requires being signed into Vercel) or localhost. The current branch also deletes the stale localStorage key on first load and shows the deployed build hash in Settings → About so it's always possible to confirm which build you're on.
+`feature/auth-multi-trip` merged to `main` (`075a0ef`) with the user's explicit approval and auto-deployed by Vercel. Post-deploy smoke test against the public production domain: `/` and `/settings` 307→`/login` when signed out, `/login` serves the new sign-in page (200), `/api/expenses` returns 401 unauthenticated. The old pre-auth build (and its "permission denied" / stale-identity symptoms) is gone. Remaining before full multi-user rollout: custom SMTP (built-in Supabase email is ~2/hour and team-addresses-only), then invite Shruti & Anshul from `/trips` linking their guest identities.
 
 ## ✅ Stage 3: identity/production forensics + product completion (2026-07-19)
 
