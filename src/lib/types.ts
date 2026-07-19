@@ -47,11 +47,15 @@ export interface ProfileRow {
 export interface InvitationRow {
   id: string;
   trip_id: string;
-  email: string;
+  email: string | null;
   member_id: string | null;
+  token: string;
+  expires_at: string;
   role: "owner" | "member";
   status: "pending" | "accepted" | "revoked";
   created_at: string;
+  /** Present when selected with `members(name)`. */
+  members: { name: string } | null;
 }
 
 export interface ExpenseParticipantRow {
@@ -107,10 +111,19 @@ export interface Profile {
 
 export interface Invitation {
   id: string;
-  email: string;
+  email: string | null;
   memberId: string | null;
+  memberName: string | null;
+  token: string;
+  expiresAt: Date;
   role: "owner" | "member";
   status: "pending" | "accepted" | "revoked";
+}
+
+export interface InvitationPreview {
+  tripName: string;
+  memberName: string;
+  isValid: boolean;
 }
 
 export interface Expense {

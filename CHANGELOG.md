@@ -1,6 +1,18 @@
 # Changelog
 
-## [Unreleased] — Auth Phase 1: Google + email OTP (branch `feature/auth-multi-trip`)
+## [Unreleased] — Invitations & member claiming (branch `feature/invitations`)
+
+Shareable invite links replace the email-only auto-claim flow (kept as an optional secondary path). Migration `20260720120000_invitation_tokens`, additive — 1 pre-existing (already-revoked) invitation row backfilled a token via column default, no other data touched.
+
+- `invitations` gains `token` (unique, 24-byte hex, `pgcrypto`), `expires_at` (7-day default), `accepted_by`; `email` becomes nullable (token is now the primary claim mechanism, email is an optional secondary auto-claim-on-login restriction)
+- `invite_member()`: now member-first (`p_member_id` required — a UUID is always the target, never a name/email), returns the token instead of the invitation id
+- New `preview_invitation(token)`: **the one deliberate `anon` grant** — lets a link recipient see "Join {trip} as {member}" before signing in; returns only names + a validity flag, nothing else, and only for a token the caller already possesses
+- New `claim_invitation(token)`: `authenticated`-only, the token is the sole credential (no email match needed). Guards: pending + unexpired; target member still unclaimed; caller not already linked to a *different* member (`members.user_id` is globally unique — one account, one identity, ever); claim + trip join happen atomically. Verified live (13/13, `npm run test:invitations`): token required, anon preview works, anon claim rejected, single-use (replay rejected), expiry enforced, cross-member-lock enforced, no email gate on the token itself, non-member RLS isolation holds
+- New `/join/[token]` page (public — added to proxy's allow-list): preview → "Continue to sign in" (`/login?next=/join/token`) → auto-claims once authenticated → redirects into the trip
+- Trips page: "Invite by email" replaced with a combined **Invite someone** flow — toggle existing unclaimed guest vs. create a new one inline, optional email restriction, then **Copy Link**, **WhatsApp**, and native **Share** (feature-detected) on the generated link; pending-invitations list shows member name, expired badge, and a per-invite copy-link action
+- Tests: +3 unit (link/WhatsApp URL shaping) — 18/18 total; `npm run test:invitations` new live suite
+
+## [Auth Phase 1] — Google + email OTP
 
 ### Root cause fixed: "PKCE code verifier not found in storage"
 

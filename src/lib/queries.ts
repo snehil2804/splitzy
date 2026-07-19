@@ -5,6 +5,7 @@ import type {
   Expense,
   ExpenseRow,
   Invitation,
+  InvitationPreview,
   InvitationRow,
   Member,
   Profile,
@@ -214,17 +215,24 @@ export async function addGuestMember(
   return data as string;
 }
 
+/**
+ * Creates an invitation for a specific (already-existing) member and
+ * returns its share token — the caller builds `/join/<token>` from it.
+ * `email` is optional: when given, that address is auto-claimed on its
+ * next login (see `accept_my_invitations`) in addition to the link.
+ */
 export async function inviteMember(
   tripId: string,
-  email: string,
-  memberId: string | null,
-): Promise<void> {
-  const { error } = await getSupabase().rpc("invite_member", {
+  memberId: string,
+  email?: string | null,
+): Promise<string> {
+  const { data, error } = await getSupabase().rpc("invite_member", {
     p_trip_id: tripId,
-    p_email: email,
     p_member_id: memberId,
+    p_email: email || null,
   });
   if (error) throw new Error(error.message);
+  return data as string;
 }
 
 export async function revokeInvitation(invitationId: string): Promise<void> {
@@ -267,7 +275,7 @@ export async function setMemberRole(
 export async function fetchInvitations(tripId: string): Promise<Invitation[]> {
   const { data, error } = await getSupabase()
     .from("invitations")
-    .select("*")
+    .select("*, members(name)")
     .eq("trip_id", tripId)
     .eq("status", "pending")
     .order("created_at");
@@ -276,9 +284,37 @@ export async function fetchInvitations(tripId: string): Promise<Invitation[]> {
     id: row.id,
     email: row.email,
     memberId: row.member_id,
+    memberName: row.members?.name ?? null,
+    token: row.token,
+    expiresAt: new Date(row.expires_at),
     role: row.role,
     status: row.status,
   }));
+}
+
+/** Public: works signed-out, so a link recipient can see what they're joining. */
+export async function previewInvitation(token: string): Promise<InvitationPreview | null> {
+  const { data, error } = await getSupabase().rpc("preview_invitation", {
+    p_token: token,
+  });
+  if (error) throw new Error(error.message);
+  const row = (data as Array<{ trip_name: string; member_name: string; is_valid: boolean }>)[0];
+  if (!row) return null;
+  return { tripName: row.trip_name, memberName: row.member_name, isValid: row.is_valid };
+}
+
+/**
+ * Claims an invitation as the signed-in caller — links the target member's
+ * `user_id` to this account and joins the trip. Returns the trip id so the
+ * caller can select it. The RPC is the sole source of truth for every
+ * validity/ownership check; this function does no client-side gating.
+ */
+export async function claimInvitation(token: string): Promise<string> {
+  const { data, error } = await getSupabase().rpc("claim_invitation", {
+    p_token: token,
+  });
+  if (error) throw new Error(error.message);
+  return data as string;
 }
 
 /**

@@ -1,6 +1,14 @@
 # Project Status
 
-_Last updated: 2026-07-19 (**MERGED TO MAIN + DEPLOYED TO PRODUCTION** — `075a0ef`)_
+_Last updated: 2026-07-20 (invitations on `feature/invitations`, not merged)_
+
+## 🔗 Invitations & member claiming (branch `feature/invitations`)
+
+Shareable token-based invite links, verified live (13/13, `npm run test:invitations`) — see CHANGELOG "Unreleased" for full detail. Audited against the target architecture first (Stage-2 audit report, this session): identity chain, RLS, and the guest-member model were already correct; this work added the missing piece — an actual shareable link with WhatsApp/Copy/Share, replacing the email-only auto-claim as the primary path. `tsc`/`lint`/build clean; `npm test` 18/18; `test:db` 17/17 and `test:auth` 6/6 re-run clean (no regression).
+
+**Manual dashboard step, none required** — `preview_invitation`'s `anon` grant handles the signed-out preview entirely in Postgres; no Supabase URL-configuration changes needed for this feature.
+
+_Previous entry (production merge) below._
 
 ## 🔐 Auth Phase 1 on `feature/auth-multi-trip` (not merged): Google + email OTP
 
