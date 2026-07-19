@@ -2,6 +2,22 @@
 
 _Last updated: 2026-07-19 (**MERGED TO MAIN + DEPLOYED TO PRODUCTION** — `075a0ef`)_
 
+## 🔐 Auth Phase 1 on `feature/auth-multi-trip` (not merged): Google + email OTP
+
+New login flow (Google primary, same-screen 8-digit email code, magic link as in-email fallback) with a rewritten callback and friendly error codes. See CHANGELOG "Unreleased".
+
+## ✅ Google OAuth fixed and verified (2026-07-19)
+
+**Root cause was not a code bug**, found via Supabase auth logs: every Google OAuth event traced to `referer: https://splitzy-delta.vercel.app` (production) instead of the Preview origin, because the Preview's exact `redirectTo` wasn't on the Redirect URLs allow-list — GoTrue fell back to Site URL (production, still pre-Google at the time). Fixed by adding the wildcard `https://splitzy-*-snehils-projects-979efd30.vercel.app/**` to Supabase's Redirect URLs (self-healing for every future Preview push, since Supabase's wildcard separators are `.` and `/` only, so `*` correctly spans the per-deployment hash).
+
+**Verified in the auth logs after the fix**: `/authorize` and `/callback` referer both show the Preview origin (`…cl7ow34ic-…vercel.app/auth/callback?next=%2F`), `/callback` → 302 with a successful `login {provider: google}` event, followed by `/token` 200 and `/user` 200 — session fully established and readable. Temporary diagnostic logging added during the investigation has been removed; the SSR cookie-adapter's error logging (previously a silent swallow) stays as permanent hardening.
+
+**Manual Supabase dashboard steps still required (cannot be done via API):**
+1. **Email templates** (Authentication → Email Templates): the current default sends only a link. For the code flow the email must show the code, and for cross-context-safe links the URL must use the token-hash form. Update **Magic Link** (and **Confirm signup**, used for first-time-signup emails) to include, e.g.:
+   `<p>Your Splitzy code: <strong>{{ .Token }}</strong></p>`
+   `<p>Or tap: <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Sign in</a></p>`
+2. **Redirect URLs** (Authentication → URL Configuration): add `http://localhost:3777/**` (dev-server port; only :3000 is allow-listed today).
+
 ## ✅ Live in production (`splitzy-delta.vercel.app`)
 
 `feature/auth-multi-trip` merged to `main` (`075a0ef`) with the user's explicit approval and auto-deployed by Vercel. Post-deploy smoke test against the public production domain: `/` and `/settings` 307→`/login` when signed out, `/login` serves the new sign-in page (200), `/api/expenses` returns 401 unauthenticated. The old pre-auth build (and its "permission denied" / stale-identity symptoms) is gone. Remaining before full multi-user rollout: custom SMTP (built-in Supabase email is ~2/hour and team-addresses-only), then invite Shruti & Anshul from `/trips` linking their guest identities.
