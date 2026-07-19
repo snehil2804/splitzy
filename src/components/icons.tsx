@@ -135,6 +135,15 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
+export function MailIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 6h15v12h-15z" />
+      <path d="m4.5 6.8 7.5 6 7.5-6" />
+    </Icon>
+  );
+}
+
 export function SparklesIcon(props: IconProps) {
   return (
     <Icon {...props}>

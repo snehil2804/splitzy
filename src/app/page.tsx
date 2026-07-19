@@ -7,8 +7,7 @@ import { ExpenseCard } from "@/components/ExpenseCard";
 import { ChevronRightIcon, PlusIcon, ScaleIcon } from "@/components/icons";
 import { SettlementList } from "@/components/SettlementList";
 import { CardSkeleton, ListSkeleton, Skeleton } from "@/components/Skeleton";
-import { EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
-import { useIdentity } from "@/hooks/useIdentity";
+import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
 import { useTripData } from "@/hooks/useTripData";
 import { computeBalances, computeSettlements, totalSpent } from "@/lib/balances";
 import { formatINR, greetingForHour } from "@/lib/format";
@@ -27,7 +26,6 @@ function useGreeting() {
 
 export default function DashboardPage() {
   const { status, data, error, refresh } = useTripData();
-  const identity = useIdentity();
   const greeting = useGreeting();
 
   const derived = useMemo(() => {
@@ -42,8 +40,11 @@ export default function DashboardPage() {
     };
   }, [data]);
 
+  const myMember = data?.myMemberId
+    ? data.members.find((m) => m.id === data.myMemberId)
+    : undefined;
   const myBalance = derived?.balances.find(
-    (b) => identity && b.member.name.toLowerCase() === identity.toLowerCase(),
+    (b) => data?.myMemberId && b.member.id === data.myMemberId,
   );
 
   return (
@@ -51,11 +52,15 @@ export default function DashboardPage() {
       <header className="anim-fade-up pt-2">
         <p className="text-sm font-medium text-ink-muted">
           {greeting}
-          {identity ? `, ${identity}` : ""} 👋
+          {myMember ? `, ${myMember.name}` : ""} 👋
         </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">
-          {data?.trip ? data.trip.name : "Your trip, split fairly"}
-        </h1>
+        <Link
+          href="/trips"
+          className="tap mt-1 inline-flex items-center gap-1.5 text-2xl font-bold tracking-tight"
+        >
+          {data?.trip ? data.trip.name : "Your trips"}
+          <ChevronRightIcon className="mt-1 size-5 text-ink-faint" />
+        </Link>
       </header>
 
       {status === "unconfigured" && <SetupNotice />}
@@ -70,12 +75,31 @@ export default function DashboardPage() {
 
       {status === "error" && <ErrorState message={error ?? ""} onRetry={refresh} />}
 
-      {status === "ready" && data && derived && (
+      {status === "forbidden" && <AccessDeniedState onRetry={refresh} />}
+
+      {status === "ready" && data && !data.trip && (
+        <EmptyState
+          emoji="🧳"
+          title="No trips yet"
+          message="Create your first trip and invite the people you're travelling with."
+          action={
+            <Link
+              href="/trips"
+              className="tap mt-2 inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/25"
+            >
+              <PlusIcon className="size-4" strokeWidth={2.4} />
+              Create a trip
+            </Link>
+          }
+        />
+      )}
+
+      {status === "ready" && data && data.trip && derived && (
         <>
-          {/* Hero: trip total */}
+          {/* Hero: trip total + personal stats */}
           <section className="anim-fade-up relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-brand via-violet-500 to-accent p-6 text-white shadow-xl shadow-brand/25">
             <div className="pointer-events-none absolute -right-8 -top-10 size-40 rounded-full bg-white/15 blur-2xl" />
-            <p className="text-sm font-medium text-white/75">Total spent</p>
+            <p className="text-sm font-medium text-white/75">Trip Total</p>
             <p className="mt-1 text-4xl font-bold tracking-tight">
               <AnimatedNumber value={derived.total} />
             </p>
@@ -86,44 +110,31 @@ export default function DashboardPage() {
               </span>
               <span className="size-1 rounded-full bg-white/50" />
               <span>
-                {formatINR(
-                  data.members.length ? derived.total / data.members.length : 0,
-                )}{" "}
-                per person
+                {data.members.length}{" "}
+                {data.members.length === 1 ? "member" : "members"}
               </span>
             </div>
           </section>
 
-          {/* Personal balance, when the device knows who you are */}
+          {/* Personal stats, when the account is linked to a trip member */}
           {myBalance && (
             <section
-              className="anim-fade-up glass rounded-3xl p-5"
+              className="anim-fade-up grid grid-cols-3 gap-3"
               style={{ animationDelay: "60ms" }}
             >
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-sm font-semibold text-ink-muted">
-                  Your balance
-                </h2>
-                <span
-                  className={`text-lg font-bold tabular-nums ${
-                    Math.abs(myBalance.net) < 1
-                      ? "text-ink-muted"
-                      : myBalance.net > 0
-                        ? "text-positive"
-                        : "text-negative"
-                  }`}
-                >
-                  {myBalance.net > 0 ? "+" : ""}
-                  {formatINR(myBalance.net)}
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-ink-muted">
-                {Math.abs(myBalance.net) < 1
-                  ? "You're all square. Nice."
-                  : myBalance.net > 0
-                    ? "The group owes you — enjoy it."
-                    : "You owe the group a little."}
-              </p>
+              <StatTile label="You Paid" value={formatINR(myBalance.paid)} />
+              <StatTile label="Your Share" value={formatINR(myBalance.share)} />
+              <StatTile
+                label="Your Balance"
+                value={`${myBalance.net > 0 ? "+" : ""}${formatINR(myBalance.net)}`}
+                tone={
+                  Math.abs(myBalance.net) < 1
+                    ? "muted"
+                    : myBalance.net > 0
+                      ? "positive"
+                      : "negative"
+                }
+              />
             </section>
           )}
 
@@ -144,7 +155,10 @@ export default function DashboardPage() {
                 <ChevronRightIcon className="size-3.5" />
               </Link>
             </div>
-            <SettlementList settlements={derived.settlements} identity={identity} />
+            <SettlementList
+              settlements={derived.settlements}
+              identity={myMember?.name ?? null}
+            />
           </section>
 
           {/* Recent expenses */}
@@ -191,14 +205,14 @@ export default function DashboardPage() {
           >
             <Link
               href="/add"
-              className="tap flex items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand/25"
+              className="tap flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand/25"
             >
               <PlusIcon className="size-4" strokeWidth={2.4} />
               Add expense
             </Link>
             <Link
               href="/balances"
-              className="tap glass flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold"
+              className="tap glass flex min-h-12 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold"
             >
               <ScaleIcon className="size-4" />
               Balances
@@ -206,6 +220,33 @@ export default function DashboardPage() {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "muted" | "positive" | "negative";
+}) {
+  const toneClass =
+    tone === "positive"
+      ? "text-positive"
+      : tone === "negative"
+        ? "text-negative"
+        : tone === "muted"
+          ? "text-ink-muted"
+          : "";
+  return (
+    <div className="glass flex flex-col gap-1 rounded-3xl p-4">
+      <span className="text-[11px] font-semibold text-ink-muted">{label}</span>
+      <span className={`text-sm font-bold tabular-nums ${toneClass}`}>
+        {value}
+      </span>
     </div>
   );
 }

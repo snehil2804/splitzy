@@ -4,6 +4,10 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
+  /* Single source of truth for how much room the fixed tab bar (plus its
+     floating button overhang and the iOS home-indicator inset) needs below
+     scrollable content. <main> pads by this; anchor scrolls respect it. */
+  --tabbar-clearance: calc(6.5rem + env(safe-area-inset-bottom));
   --canvas: #f5f4fb;
   --surface: rgba(255, 255, 255, 0.66);
   --surface-strong: #ffffff;
@@ -57,6 +61,8 @@
 html {
   color-scheme: light;
   -webkit-tap-highlight-color: transparent;
+  /* Focus/anchor scrolls never land under the fixed tab bar. */
+  scroll-padding-bottom: var(--tabbar-clearance);
 }
 
 html[data-theme="dark"] {

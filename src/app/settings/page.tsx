@@ -1,14 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
-import { MoonIcon, SparklesIcon, SunIcon } from "@/components/icons";
-import { setIdentity, useIdentity } from "@/hooks/useIdentity";
+import {
+  ChevronRightIcon,
+  MoonIcon,
+  SparklesIcon,
+  SunIcon,
+} from "@/components/icons";
+import { useSession } from "@/hooks/useSession";
 import { setThemePreference, useTheme } from "@/hooks/useTheme";
 import { useTripData } from "@/hooks/useTripData";
 import type { ThemePreference } from "@/lib/constants";
 
-/** Shown until the member list arrives from Supabase. */
-const DEFAULT_MEMBERS = ["Snehil", "Shruti", "Anshul"];
+/**
+ * Deployed commit, inlined at build time. Vercel exposes this
+ * automatically (System Environment Variables); locally it's absent.
+ * Lets anyone confirm which build they're actually looking at.
+ */
+const BUILD_ID =
+  process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local dev";
 
 const THEME_OPTIONS: Array<{
   value: ThemePreference;
@@ -21,13 +32,13 @@ const THEME_OPTIONS: Array<{
 ];
 
 export default function SettingsPage() {
-  const identity = useIdentity();
   const theme = useTheme();
   const { data } = useTripData();
+  const { session } = useSession();
 
-  const memberNames = data?.members.length
-    ? data.members.map((m) => m.name)
-    : DEFAULT_MEMBERS;
+  const myMember = data?.myMemberId
+    ? data.members.find((m) => m.id === data.myMemberId)
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -36,37 +47,25 @@ export default function SettingsPage() {
         <p className="mt-1 text-sm text-ink-muted">Make Splitzy feel like yours.</p>
       </header>
 
-      {/* Identity */}
-      <section className="anim-fade-up glass rounded-3xl p-5">
-        <h2 className="text-sm font-semibold">Who are you?</h2>
-        <p className="mt-0.5 text-xs text-ink-muted">
-          Used for greetings and &quot;you owe&quot; framing on this device.
-        </p>
-        <div className="mt-4 grid grid-cols-3 gap-2.5">
-          {memberNames.map((name) => {
-            const selected = identity?.toLowerCase() === name.toLowerCase();
-            return (
-              <button
-                key={name}
-                onClick={() => setIdentity(selected ? null : name)}
-                aria-pressed={selected}
-                className={`tap flex flex-col items-center gap-2 rounded-2xl border-2 py-4 transition-colors ${
-                  selected
-                    ? "border-brand bg-brand-soft"
-                    : "border-transparent bg-line/60"
-                }`}
-              >
-                <Avatar name={name} size="md" />
-                <span
-                  className={`text-xs font-semibold ${selected ? "text-brand" : ""}`}
-                >
-                  {name}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {/* Profile shortcut — identity comes from your account, not a picker */}
+      <Link
+        href="/profile"
+        className="tap anim-fade-up glass flex min-h-14 items-center gap-3 rounded-3xl p-5"
+      >
+        <Avatar
+          name={myMember?.name ?? session?.user.email ?? "?"}
+          size="md"
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">
+            {myMember?.name ?? "Your profile"}
+          </span>
+          <span className="block truncate text-xs text-ink-muted">
+            {session?.user.email ?? "Signed in"}
+          </span>
+        </span>
+        <ChevronRightIcon className="size-4 shrink-0 text-ink-faint" />
+      </Link>
 
       {/* Appearance */}
       <section
@@ -82,7 +81,7 @@ export default function SettingsPage() {
                 key={value}
                 onClick={() => setThemePreference(value)}
                 aria-pressed={selected}
-                className={`tap flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                className={`tap flex min-h-11 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
                   selected
                     ? "bg-surface-strong text-brand shadow-sm"
                     : "text-ink-muted"
@@ -102,17 +101,23 @@ export default function SettingsPage() {
         style={{ animationDelay: "120ms" }}
       >
         <h2 className="text-sm font-semibold">Trip</h2>
-        <div className="mt-3 flex items-center gap-3 rounded-2xl bg-line/60 p-4">
+        <Link
+          href="/trips"
+          className="tap mt-3 flex min-h-14 items-center gap-3 rounded-2xl bg-line/60 p-4"
+        >
           <span className="text-2xl">🧳</span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
-              {data?.trip?.name ?? "Loading trip…"}
-            </p>
-            <p className="text-xs text-ink-muted">
-              {memberNames.join(" · ")}
-            </p>
-          </div>
-        </div>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">
+              {data?.trip?.name ?? "No trip selected"}
+            </span>
+            <span className="block truncate text-xs text-ink-muted">
+              {data?.members.length
+                ? data.members.map((m) => m.name).join(" · ")
+                : "Create or join a trip"}
+            </span>
+          </span>
+          <ChevronRightIcon className="size-4 shrink-0 text-ink-faint" />
+        </Link>
       </section>
 
       {/* About */}
@@ -122,11 +127,13 @@ export default function SettingsPage() {
       >
         <h2 className="text-sm font-semibold">About</h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          Splitzy keeps trip money simple for three friends. Soon, an Apple
-          Shortcut will log expenses automatically right after you pay via UPI
-          — no typing at all.
+          Splitzy keeps trip money simple. Soon, an Apple Shortcut will log
+          expenses automatically right after you pay via UPI — no typing at
+          all.
         </p>
-        <p className="mt-3 text-xs text-ink-faint">Splitzy v0.1 · Made with 💜</p>
+        <p className="mt-3 text-xs text-ink-faint">
+          Splitzy v0.2 · Build {BUILD_ID} · Made with 💜
+        </p>
       </section>
     </div>
   );

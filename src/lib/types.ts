@@ -11,6 +11,8 @@ export interface MemberRow {
   id: string;
   name: string;
   is_active: boolean;
+  /** Linked auth user; null = guest member (no login). */
+  user_id: string | null;
   created_at: string;
 }
 
@@ -21,6 +23,34 @@ export interface TripRow {
   status: string;
   started_at: string | null;
   ended_at: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface TripMemberRow {
+  id: string;
+  trip_id: string;
+  member_id: string;
+  role: "owner" | "member";
+  is_active: boolean;
+  joined_at: string;
+  members: MemberRow | null;
+}
+
+export interface ProfileRow {
+  id: string;
+  email: string;
+  display_name: string | null;
+  created_at: string;
+}
+
+export interface InvitationRow {
+  id: string;
+  trip_id: string;
+  email: string;
+  member_id: string | null;
+  role: "owner" | "member";
+  status: "pending" | "accepted" | "revoked";
   created_at: string;
 }
 
@@ -58,12 +88,29 @@ export interface ExpenseRow {
 export interface Member {
   id: string;
   name: string;
+  /** Null for guest members (no login). */
+  userId: string | null;
+  role: "owner" | "member";
 }
 
 export interface Trip {
   id: string;
   name: string;
   status: string;
+}
+
+export interface Profile {
+  id: string;
+  email: string;
+  displayName: string | null;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  memberId: string | null;
+  role: "owner" | "member";
+  status: "pending" | "accepted" | "revoked";
 }
 
 export interface Expense {
@@ -97,15 +144,37 @@ export interface Settlement {
 }
 
 export interface TripData {
-  members: Member[];
+  /** Every trip the signed-in user belongs to (RLS-scoped), newest first. */
+  trips: Trip[];
+  /** The currently selected trip (from the switcher), or null if none. */
   trip: Trip | null;
+  /** Active members of the selected trip. */
+  members: Member[];
+  /** The signed-in user's member identity, if linked. */
+  myMemberId: string | null;
+  myRole: "owner" | "member" | null;
   expenses: Expense[];
 }
 
 /**
- * Input for `addEqualExpense()`. Maps to `add_equal_expense()`'s params by
- * name inside `queries.ts`; the split itself is computed by that Postgres
- * function, never in the client.
+ * Input for `addExpense()`. Maps to the `add_expense()` RPC (ID-based, any
+ * trip size); the split itself is computed by that Postgres function, never
+ * in the client.
+ */
+export interface AddExpenseInput {
+  tripId: string;
+  paidById: string;
+  amount: number;
+  description: string;
+  participantIds: string[];
+  paymentApp: string | null;
+  paidAt: Date;
+  locationName: string | null;
+}
+
+/**
+ * Input for the legacy `POST /api/expenses` path (name-based
+ * `add_equal_expense()`), kept for the future Apple Shortcut pipeline.
  */
 export interface AddEqualExpenseInput {
   tripId: string;

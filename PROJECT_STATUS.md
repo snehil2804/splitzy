@@ -1,6 +1,33 @@
 # Project Status
 
-_Last updated: 2026-07-19 (real credentials in place — READY FOR DEPLOYMENT)_
+_Last updated: 2026-07-19 (Stage 3 complete on `feature/auth-multi-trip` — verified end-to-end, not merged)_
+
+## ⚠️ Important: production (`splitzy-delta.vercel.app`) is knowingly broken until merge
+
+Production still serves `main` (`aa7b59b`, the pre-auth build). The Stage 2 RLS cutover removed anonymous database access, so that old build now shows "permission denied for table members" — and it greets from the legacy `localStorage["splitzy:identity"]` value (hence "Good evening, Anshul" if Anshul was ever tapped in the old picker). **This is not a bug in the feature branch**; it resolves the moment `feature/auth-multi-trip` merges to `main`. Test only the newest Vercel Preview (requires being signed into Vercel) or localhost. The current branch also deletes the stale localStorage key on first load and shows the deployed build hash in Settings → About so it's always possible to confirm which build you're on.
+
+## ✅ Stage 3: identity/production forensics + product completion (2026-07-19)
+
+- Confirmed the "Anshul greeting + permission denied + network copy" report was entirely the old production build (200 with no login redirect, `/login` 404, "Who are you" present in served HTML). Database mapping was and is correct.
+- New: owner role management (`set_trip_member_role` RPC + Make owner/member UI, last-owner demotion blocked), archive/reactivate trip with confirmation sheets, remove-member confirmation sheet, archived-trip read-only guard on Add Expense, honest error copy (network vs generic; raw DB errors dev-only, logged in prod), stale-identity cleanup, build-hash indicator.
+- New test infrastructure: `npm test` (8 unit tests: balance math incl. the ₹900 → +600/−300/−300 expectation, settlements, error classification) and `npm run test:db` (17-check live end-to-end: Snehil identity/owner mapping, RLS isolation both directions, onboarding state, trip creation/switching, guest members, paise splits, cross-trip rejection, logout, anon lockout — self-cleaning test sandbox).
+- Full verification this pass: typecheck ✓, lint ✓, 8/8 unit ✓, 17/17 db-e2e ✓, build ✓ (15 routes), local route smoke ✓, secret-bundle grep ✓, baseline data re-verified byte-identical (1 trip / 3 members / 3 tm / 3 expenses / 9 eps / ₹900 / Snehil linked + owner).
+
+## 🔐 Stage 2: authenticated multi-trip (complete on branch, not merged)
+
+Full implementation per the approved Stage 0 plan — see CHANGELOG "Unreleased" for the complete change list. Highlights:
+
+- **Auth fixed and verified end-to-end**: "Signups not allowed for otp" was Stage 1's `shouldCreateUser: false` with zero users in `auth.users`; now open-signup + RLS. A disposable-test-user run passed 15/15 checks (magic-link token → session, RLS isolation, anon lockout, RPCs, splits, sign-out), then removed every row it created; baseline re-verified byte-identical (1 trip / 3 members / 3 expenses / ₹900 live / same IDs).
+- **Database**: 4 additive migrations (`auth_multitrip_schema`, `authenticated_rls_cutover`, `multitrip_rpcs`, `fix_accept_invitations_qualified_call`). All existing rows and IDs untouched — verified by count/ID/sum comparison before and after. Anonymous access fully removed.
+- **Web app**: multi-trip switcher (`/trips`), profile page (`/profile`), invitations + guest members, dashboard stat tiles (Trip Total / You Paid / Your Share / Your Balance), authenticated identity everywhere (no "Who are you?" picker), responsive tab-bar/safe-area/keyboard fixes.
+- `tsc --noEmit`, `lint`, `build` clean; secret-key bundle grep clean; dev-server smoke test: all pages 307→`/login` unauthenticated, `/login` 200, `/api/expenses` 401 JSON without a session.
+
+## ⏭ Remaining before merge to main
+
+1. **Human end-to-end pass on the Vercel preview or localhost**: sign up with your real email, create/see trips, invite Shruti & Anshul (linking their guest identities), add + delete an expense from the UI.
+2. **Bootstrap Default Trip ownership** (one-time, after Snehil first signs in): no auth user exists yet, so nobody owns Default Trip. Either (a) sign up, create nothing, then ask me to link your user to member "Snehil" + set your `trip_members.role='owner'` on Default Trip (two UPDATE statements I'll present for approval), or (b) abandon Default Trip and recreate the trip in-app (loses the ₹900 test expense's trip context — not recommended).
+3. **Custom SMTP before Shruti/Anshul onboard** — built-in email only delivers to project-team addresses (~2/hour).
+4. Merge + production deploy (needs your explicit go).
 
 ## ✅ Completed
 
@@ -153,10 +180,22 @@ Ran after real credentials were pasted into `.env.local` and the dev server rest
 
 **Not yet done (not blockers, just not verified in this pass):** a full interactive browser walkthrough (loading the real dashboard/expenses/balances data, adding a real expense end-to-end, exercising delete) hasn't been driven from a browser — the underlying DB permissions were already confirmed via the `anon`-role smoke test in the prior session (1 active trip, 3 members, 1 expense, 3 participants all visible), and this pass's dev-server spot check confirms the server boots and validates correctly with the real credentials now in place.
 
+## ✅ Pushed to GitHub (2026-07-19)
+
+Repo created and connected: `github.com/snehil2804/splitzy` (private), added as `origin`, `main` pushed and tracking `origin/main`.
+
+Before the first push, ran a full security/git audit:
+- `git remote -v` was empty (no remote existed yet) and `gh` wasn't installed — installed via `brew install gh`, then the user authenticated interactively (`gh auth login`, account `snehil2804`) before anything was created or pushed.
+- Found `CLAUDE.md` already tracked by git from the initial `create-next-app` commit (it predates this file's current content) and not covered by `.gitignore`. Fixed: added `CLAUDE.md`, `.claude/`, and `.mcp.json` to `.gitignore`, then `git rm --cached CLAUDE.md` (local file untouched, just untracked).
+- `.env.local` was already correctly excluded via the existing `.env*` glob in `.gitignore`; confirmed never tracked (`git ls-files` empty) and no `.env*` file appears anywhere in git history.
+- Grepped every tracked/staged file for key-shaped patterns (`SUPABASE_SECRET_KEY`, `service_role`, JWT-looking strings, `sk_live`/`sk_test`, PEM headers) — every hit was a doc/comment *referencing* the variable name (or `SETUP.md`'s literal `<PASTE_SECRET_KEY_HERE>` placeholder), never a real value. No secrets in the pushed commit or its history.
+- Repo created private (`gh repo create splitzy --private`) since this is a 3-person personal app, not intended for public visibility.
+- Commit `aa7b59b` "Prepare Splitzy for Vercel deployment" — 49 files, no `node_modules`/`.next`/build output/credentials.
+
 ## 📋 Remaining
 
+- [ ] Add the same 3 env vars to Vercel (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) and import `snehil2804/splitzy` as the Vercel project — see SETUP.md
 - [ ] Manual/visual walkthrough of the running app against live data (dashboard, expenses, balances, add-expense, delete) — recommended before considering the feature fully done, though not a deployment blocker
-- [ ] Add the same 3 env vars to Vercel (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) before deploying there — see SETUP.md
 - [ ] Visual pass on a real iPhone (safe areas, standalone PWA mode)
 - [ ] Apple Shortcut → Edge Function pipeline (Phases 3–4, see ROADMAP.md)
 - [ ] Optional: Supabase Realtime subscription so expenses appear live

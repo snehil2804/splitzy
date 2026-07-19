@@ -61,3 +61,16 @@ Behavioural notes:
 If anything else in the schema changes, adjust only `src/lib/queries.ts`, `src/lib/types.ts`, and `src/app/api/expenses/route.ts` — nothing else touches the database.
 
 RLS note: the app uses the publishable key with no auth, so the `members`, `trips`, `trip_members`, `expenses`, `expense_participants` tables need `anon` `SELECT`, and `expenses` needs `anon` `UPDATE` (for soft delete). **As of 2026-07-19, production has RLS enabled on all 5 tables with zero policies defined**, which means `anon` currently gets zero rows on every read despite holding the table-level grants — this must be fixed with RLS policies (proposed, not yet applied — pending approval) before live data will appear. Appropriate for a private app shared by three trusted people; lock down further (e.g. per-trip scoping) when auth is added.
+
+---
+
+## Stage 2 addendum (2026-07-19, branch `feature/auth-multi-trip`)
+
+The contract above predates authentication. What changed (see CHANGELOG "Unreleased" for full detail):
+
+- **Auth**: Supabase magic-link (PKCE) with open signup; sessions in cookies via `@supabase/ssr`; `src/proxy.ts` gates every page.
+- **New tables**: `profiles` (one per auth user, trigger-created), `invitations` (owner-issued; optionally linked to an unclaimed guest member so accepting claims that identity).
+- **New columns**: `members.user_id` (null = guest member), `trips.created_by`, `trip_members.role` (`owner`/`member`) + `is_active` + `left_at`, `expenses.created_by`. `participant_count` CHECK widened to `>= 1`.
+- **RLS**: `anon` fully revoked. `authenticated` reads are scoped to active trip membership; writes are column-scoped grants (expenses soft-delete cols; trips name/description/status/ended_at for owners; own profiles.display_name) or SECURITY DEFINER RPCs: `create_trip`, `add_guest_member`, `invite_member`, `revoke_invitation`, `accept_my_invitations`, `set_trip_member_active`, `ensure_my_member`, `add_expense`.
+- **Write path**: the web form now calls `add_expense()` (ID-based, any trip size) directly from the browser. `POST /api/expenses` + `add_equal_expense()` remain only for the future Apple Shortcut path, now requiring a session (401) and trip membership (403). Note `add_equal_expense()` internally hardcodes the original three names for its "Everyone" option — do not use it for new trips.
+- **`trip_members` is now queried** — it is the per-trip roster and role source; the old "3 global members" note above no longer applies.

@@ -7,6 +7,9 @@ interface ConfirmSheetProps {
   title: string;
   message: string;
   confirmLabel: string;
+  /** Shown on the confirm button while `busy` (default keeps delete copy). */
+  busyLabel?: string;
+  cancelLabel?: string;
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -18,6 +21,8 @@ export function ConfirmSheet({
   title,
   message,
   confirmLabel,
+  busyLabel = "Deleting…",
+  cancelLabel = "Keep it",
   busy = false,
   onConfirm,
   onCancel,
@@ -61,14 +66,14 @@ export function ConfirmSheet({
             disabled={busy}
             className="tap rounded-2xl bg-negative py-3.5 text-sm font-semibold text-white shadow-lg shadow-negative/25 disabled:opacity-60"
           >
-            {busy ? "Deleting…" : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
           <button
             onClick={onCancel}
             disabled={busy}
             className="tap rounded-2xl bg-line py-3.5 text-sm font-semibold"
           >
-            Keep it
+            {cancelLabel}
           </button>
         </div>
       </div>

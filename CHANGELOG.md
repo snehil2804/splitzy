@@ -1,5 +1,61 @@
 # Changelog
 
+## [Unreleased] — Stage 3: forensics + completion (branch `feature/auth-multi-trip`)
+
+- **Diagnosed the "Anshul / permission denied / network error" report**: the user was on production (`main`, pre-auth build), which broke by design when the RLS cutover removed anon access, and which greets from the legacy localStorage identity. The feature branch was already correct; production heals on merge.
+- Legacy `splitzy:identity` localStorage key now deleted on first load (pre-paint script) so the old picker value can never resurface.
+- Settings → About shows the deployed build hash (`NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA`) for deployment diagnosis.
+- Honest error copy: network-specific message only for real fetch failures; generic copy otherwise; raw DB error text shown in development only (logged to console in production).
+- Trips: archive/reactivate with confirmation sheet; remove-member confirmation sheet; owner role management ("Make owner"/"Make member") via new `set_trip_member_role` RPC (migration `20260719163000`, blocks demoting the last active owner); Add Expense shows a read-only notice for archived trips.
+- `ConfirmSheet` gained configurable busy/cancel labels.
+- Tests: `npm test` (tsx + node:test — balance math incl. ₹900 → +600/−300/−300, settlements, partial splits, error classification) and `npm run test:db` (17-check live e2e with self-cleaning sandbox); `npm run typecheck` script added.
+
+## [Stage 2] — authenticated multi-trip (branch `feature/auth-multi-trip`)
+
+### Fixed — "Signups not allowed for otp" on the login page
+
+Root cause: Stage 1's `shouldCreateUser: false` (invite-only) combined with an empty `auth.users` — every login attempt was a "new user" and GoTrue rejected it. Now `shouldCreateUser: true`: open signup is safe because RLS only reveals trips you're an active member of; a stranger who signs up sees an empty app.
+
+### Database (4 migrations, all additive — verified zero changes to existing rows/IDs)
+
+- `profiles` (auto-created by trigger on `auth.users` insert), `invitations` (owner-issued, optionally linked to an unclaimed guest member so accepting claims that identity + history)
+- Added: `members.user_id` (null = guest), `trips.created_by`, `trip_members.role/is_active/left_at`, `expenses.created_by`
+- Widened `expenses_valid_participant_count` from `1..3` to `>= 1` (any trip size)
+- **RLS cutover**: all 6 `anon` policies dropped, `anon` grants revoked — anonymous users get nothing. New `authenticated` policies scope everything to active trip membership via `is_trip_member()` / `is_trip_owner()` (SECURITY DEFINER helpers). Writes restricted to column-scoped grants (soft-delete columns on `expenses`; `name/description/status/ended_at` on `trips` for owners; `display_name` on own profile) — everything else via RPC
+- New RPCs (SECURITY DEFINER, `authenticated`-only EXECUTE): `create_trip`, `add_guest_member`, `invite_member`, `revoke_invitation`, `accept_my_invitations`, `set_trip_member_active`, `ensure_my_member`, and `add_expense` (ID-based, any trip size, cross-trip/participant validation, paise rounding copied from `add_equal_expense`)
+- Verified by an automated end-to-end run with a disposable test user (15/15 checks: session, RLS isolation, anon lockout, owner role, guest members, split math, cross-trip rejection, column-grant enforcement, sign-out) — all test rows and the test user removed afterwards; baseline data re-verified intact
+
+### App
+
+- Multi-trip: trip switcher + create/rename/manage on new `/trips`; selected trip persisted per device (`splitzy:tripId`); `fetchTripData(tripId)` now reads members from `trip_members`
+- Identity is the signed-in account: `useIdentity`/"Who are you?" removed everywhere; `myMemberId`/`myRole` derived from `members.user_id`; pending invitations auto-accepted after login
+- New `/profile` (display name, linked member, sign out); Settings slimmed (profile + trips links, theme, about)
+- Dashboard: "Total spent" → **Trip Total**; new You Paid / Your Share / Your Balance stat tiles
+- Add Expense now calls `add_expense()` directly from the browser (RLS/definer-validated); `POST /api/expenses` kept for the future Shortcut path but now requires a session (401) and trip membership (403)
+- Hardcoded members removed (avatar colors are name-hashed; no `DEFAULT_MEMBERS`)
+- Responsive: `--tabbar-clearance` variable drives content padding + `scroll-padding-bottom`; tab bar uses `max(0.75rem, safe-area-inset-bottom)`; `interactiveWidget: resizes-content` so keyboards don't cover inputs; ≥44px touch targets on nav/list rows
+- Proxy: `/api/*` passes through (routes answer 401 JSON themselves instead of a login redirect)
+
+## [Stage 1] — 2026-07-19 — authentication (branch `feature/auth-multi-trip`)
+
+### Added — Supabase SSR magic-link auth, not yet mergeable to `main`
+
+- `@supabase/ssr` added as a dependency; `src/lib/supabase.ts` now uses `createBrowserClient` (cookie-based session) instead of `createClient` with `persistSession: false`
+- `src/lib/supabase-auth-server.ts` (new): cookie-aware server client for Route Handlers/Server Components — distinct from the pre-existing service-role `supabase-server.ts`, which is untouched
+- `src/lib/supabase-middleware.ts` + `src/proxy.ts` (new): Next.js 16's renamed Proxy convention refreshes the session via `getClaims()` on every matched request, redirects signed-out users to `/login`, and signed-in users away from `/login`
+- `src/app/login/page.tsx` (new): magic-link sign-in form (`signInWithOtp`, `shouldCreateUser: false` — invite-only), with idle/sending/sent/error states; wrapped in `Suspense` for `useSearchParams`
+- `src/app/auth/callback/route.ts` (new, `GET /auth/callback`): exchanges the PKCE `code` for a session, or relays Supabase's own `error_description` (expired/used link) back to `/login`; origin derived from the incoming request, no `NEXT_PUBLIC_APP_URL`
+- `src/hooks/useSession.ts` (new): client-side session mirror (`onAuthStateChange`) for UI states — `proxy.ts` remains the actual access-control boundary
+- `src/app/settings/page.tsx`: sign-out button + signed-in email, shown when authenticated
+- `src/components/TabBar.tsx`: hidden on `/login`
+- `src/components/icons.tsx`: added `MailIcon`
+
+### Known, deliberately deferred to Stage 2 (not done in Stage 1)
+
+- No RLS policies added for the `authenticated` Postgres role — reads will fail for signed-in users until Stage 2 applies them (only `anon` has SELECT policies today)
+- `/api/expenses` still has no session check — out of Stage 1's approved scope, flagged for Stage 2
+- No real users created in Supabase Auth yet; no production data or migrations touched
+
 ## [0.1.5] — 2026-07-19
 
 ### Verified — final production-readiness review, real credentials in place

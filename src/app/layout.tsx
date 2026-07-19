@@ -26,6 +26,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Mobile keyboards shrink the layout instead of overlaying the tab bar
+  // on top of focused inputs.
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f5f4fb" },
     { media: "(prefers-color-scheme: dark)", color: "#0b0a12" },
@@ -35,8 +38,11 @@ export const viewport: Viewport = {
 /**
  * Runs before paint: stamps `data-theme` from the stored preference (or the
  * system) and keeps following the system while no explicit choice is stored.
+ * Also deletes the legacy pre-auth "splitzy:identity" key — identity now
+ * comes from the signed-in account, and a stale value from the old
+ * "Who are you?" picker must never influence anything again.
  */
-const themeScript = `(function(){var k="splitzy:theme",m=matchMedia("(prefers-color-scheme: dark)"),d=document.documentElement,f=function(){var s=localStorage.getItem(k);d.dataset.theme=s==="light"||s==="dark"?s:m.matches?"dark":"light"};f();m.addEventListener("change",f)})()`;
+const themeScript = `(function(){try{localStorage.removeItem("splitzy:identity")}catch(e){}var k="splitzy:theme",m=matchMedia("(prefers-color-scheme: dark)"),d=document.documentElement,f=function(){var s=localStorage.getItem(k);d.dataset.theme=s==="light"||s==="dark"?s:m.matches?"dark":"light"};f();m.addEventListener("change",f)})()`;
 
 export default function RootLayout({
   children,
@@ -48,7 +54,7 @@ export default function RootLayout({
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <div aria-hidden className="app-glow pointer-events-none fixed inset-0" />
-        <main className="relative mx-auto min-h-dvh max-w-md px-4 pb-32 pt-[calc(1.25rem+env(safe-area-inset-top))]">
+        <main className="relative mx-auto min-h-dvh max-w-md px-4 pb-[var(--tabbar-clearance)] pt-[calc(1.25rem+env(safe-area-inset-top))]">
           {children}
         </main>
         <TabBar />
