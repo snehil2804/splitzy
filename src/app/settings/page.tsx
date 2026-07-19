@@ -1,8 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { MoonIcon, SparklesIcon, SunIcon } from "@/components/icons";
 import { setIdentity, useIdentity } from "@/hooks/useIdentity";
+import { signOut, useSession } from "@/hooks/useSession";
 import { setThemePreference, useTheme } from "@/hooks/useTheme";
 import { useTripData } from "@/hooks/useTripData";
 import type { ThemePreference } from "@/lib/constants";
@@ -24,10 +27,19 @@ export default function SettingsPage() {
   const identity = useIdentity();
   const theme = useTheme();
   const { data } = useTripData();
+  const { status: sessionStatus, session } = useSession();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
 
   const memberNames = data?.members.length
     ? data.members.map((m) => m.name)
     : DEFAULT_MEMBERS;
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    await signOut();
+    router.push("/login");
+  }
 
   return (
     <div className="space-y-6">
@@ -114,6 +126,28 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {/* Account */}
+      {sessionStatus === "authenticated" && (
+        <section
+          className="anim-fade-up glass rounded-3xl p-5"
+          style={{ animationDelay: "150ms" }}
+        >
+          <h2 className="text-sm font-semibold">Account</h2>
+          {session?.user.email && (
+            <p className="mt-0.5 text-xs text-ink-muted">
+              Signed in as {session.user.email}
+            </p>
+          )}
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="tap mt-3 w-full rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative disabled:opacity-60"
+          >
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
+        </section>
+      )}
 
       {/* About */}
       <section

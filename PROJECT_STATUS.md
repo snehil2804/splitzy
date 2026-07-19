@@ -1,6 +1,17 @@
 # Project Status
 
-_Last updated: 2026-07-19 (real credentials in place — READY FOR DEPLOYMENT)_
+_Last updated: 2026-07-19 (Stage 1 auth implemented on `feature/auth-multi-trip` — not merged)_
+
+## 🔐 Stage 1: authentication (in progress, branch `feature/auth-multi-trip`)
+
+Supabase SSR magic-link auth implemented per the Stage 0 audit's plan (PKCE flow, invite-only signup). `npx tsc --noEmit`, `npm run lint`, and `npm run build` all clean; dev-server smoke test confirmed: unauthenticated `/` → 307 to `/login`, `/login` → 200, `/auth/callback` with no code → 307 to `/login?error=...`, `/icon` unaffected (200, not redirected). Secret-key bundle check re-run and still clean (see CHANGELOG "Unreleased" entry for the full file list).
+
+**Not done yet, by design** — approved Stage 1 scope excluded these:
+- No `authenticated`-role RLS policies yet. **Consequence: once someone actually signs in, `fetchTripData()` will fail** — only `anon` has SELECT grants/policies today, and Postgres denies by default with RLS enabled and no matching policy. The login flow itself (magic link → callback → session → redirect) works independently of this; only the post-login data fetch is affected. This is the first item for Stage 2 approval.
+- `/api/expenses` has no auth check — still callable by anyone with the URL, unchanged from before Stage 1.
+- No real Supabase Auth users created; no email↔member mapping applied; nothing merged to `main` or deployed.
+
+See CHANGELOG.md "Unreleased" for the exact file list.
 
 ## ✅ Completed
 
@@ -153,10 +164,22 @@ Ran after real credentials were pasted into `.env.local` and the dev server rest
 
 **Not yet done (not blockers, just not verified in this pass):** a full interactive browser walkthrough (loading the real dashboard/expenses/balances data, adding a real expense end-to-end, exercising delete) hasn't been driven from a browser — the underlying DB permissions were already confirmed via the `anon`-role smoke test in the prior session (1 active trip, 3 members, 1 expense, 3 participants all visible), and this pass's dev-server spot check confirms the server boots and validates correctly with the real credentials now in place.
 
+## ✅ Pushed to GitHub (2026-07-19)
+
+Repo created and connected: `github.com/snehil2804/splitzy` (private), added as `origin`, `main` pushed and tracking `origin/main`.
+
+Before the first push, ran a full security/git audit:
+- `git remote -v` was empty (no remote existed yet) and `gh` wasn't installed — installed via `brew install gh`, then the user authenticated interactively (`gh auth login`, account `snehil2804`) before anything was created or pushed.
+- Found `CLAUDE.md` already tracked by git from the initial `create-next-app` commit (it predates this file's current content) and not covered by `.gitignore`. Fixed: added `CLAUDE.md`, `.claude/`, and `.mcp.json` to `.gitignore`, then `git rm --cached CLAUDE.md` (local file untouched, just untracked).
+- `.env.local` was already correctly excluded via the existing `.env*` glob in `.gitignore`; confirmed never tracked (`git ls-files` empty) and no `.env*` file appears anywhere in git history.
+- Grepped every tracked/staged file for key-shaped patterns (`SUPABASE_SECRET_KEY`, `service_role`, JWT-looking strings, `sk_live`/`sk_test`, PEM headers) — every hit was a doc/comment *referencing* the variable name (or `SETUP.md`'s literal `<PASTE_SECRET_KEY_HERE>` placeholder), never a real value. No secrets in the pushed commit or its history.
+- Repo created private (`gh repo create splitzy --private`) since this is a 3-person personal app, not intended for public visibility.
+- Commit `aa7b59b` "Prepare Splitzy for Vercel deployment" — 49 files, no `node_modules`/`.next`/build output/credentials.
+
 ## 📋 Remaining
 
+- [ ] Add the same 3 env vars to Vercel (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) and import `snehil2804/splitzy` as the Vercel project — see SETUP.md
 - [ ] Manual/visual walkthrough of the running app against live data (dashboard, expenses, balances, add-expense, delete) — recommended before considering the feature fully done, though not a deployment blocker
-- [ ] Add the same 3 env vars to Vercel (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) before deploying there — see SETUP.md
 - [ ] Visual pass on a real iPhone (safe areas, standalone PWA mode)
 - [ ] Apple Shortcut → Edge Function pipeline (Phases 3–4, see ROADMAP.md)
 - [ ] Optional: Supabase Realtime subscription so expenses appear live

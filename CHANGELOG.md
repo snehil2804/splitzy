@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased] — Stage 1: authentication (branch `feature/auth-multi-trip`)
+
+### Added — Supabase SSR magic-link auth, not yet mergeable to `main`
+
+- `@supabase/ssr` added as a dependency; `src/lib/supabase.ts` now uses `createBrowserClient` (cookie-based session) instead of `createClient` with `persistSession: false`
+- `src/lib/supabase-auth-server.ts` (new): cookie-aware server client for Route Handlers/Server Components — distinct from the pre-existing service-role `supabase-server.ts`, which is untouched
+- `src/lib/supabase-middleware.ts` + `src/proxy.ts` (new): Next.js 16's renamed Proxy convention refreshes the session via `getClaims()` on every matched request, redirects signed-out users to `/login`, and signed-in users away from `/login`
+- `src/app/login/page.tsx` (new): magic-link sign-in form (`signInWithOtp`, `shouldCreateUser: false` — invite-only), with idle/sending/sent/error states; wrapped in `Suspense` for `useSearchParams`
+- `src/app/auth/callback/route.ts` (new, `GET /auth/callback`): exchanges the PKCE `code` for a session, or relays Supabase's own `error_description` (expired/used link) back to `/login`; origin derived from the incoming request, no `NEXT_PUBLIC_APP_URL`
+- `src/hooks/useSession.ts` (new): client-side session mirror (`onAuthStateChange`) for UI states — `proxy.ts` remains the actual access-control boundary
+- `src/app/settings/page.tsx`: sign-out button + signed-in email, shown when authenticated
+- `src/components/TabBar.tsx`: hidden on `/login`
+- `src/components/icons.tsx`: added `MailIcon`
+
+### Known, deliberately deferred to Stage 2 (not done in Stage 1)
+
+- No RLS policies added for the `authenticated` Postgres role — reads will fail for signed-in users until Stage 2 applies them (only `anon` has SELECT policies today)
+- `/api/expenses` still has no session check — out of Stage 1's approved scope, flagged for Stage 2
+- No real users created in Supabase Auth yet; no production data or migrations touched
+
 ## [0.1.5] — 2026-07-19
 
 ### Verified — final production-readiness review, real credentials in place
