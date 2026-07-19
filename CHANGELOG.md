@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased] — Auth Phase 1: Google + email OTP (branch `feature/auth-multi-trip`)
+
+### Root cause fixed: "PKCE code verifier not found in storage"
+
+PKCE magic links store their code verifier in a cookie in the browser that *requested* the link; on iOS home-screen PWAs (and cross-device), the emailed link opens in a different browser context with no verifier, so the exchange failed — and the raw error was rendered to the user.
+
+- **New login page**: "Continue with Google" (primary; OAuth stays in the same context, so it works in the installed PWA), divider, then email → same-screen **verification code** entry (`verifyOtp(email, token)`, no callback context needed). Resend with 30s cooldown, change-email, paste/`one-time-code` autocomplete, loading states, double-submit guards. This project issues **8-digit** codes (verified live) — input accepts 6–8.
+- **Callback rewritten** (`/auth/callback`): handles OAuth/PKCE `?code=`, plus `?token_hash=&type=` server-side verification — the emailed link becomes cross-context-safe once the email template is updated (manual step, see PROJECT_STATUS). Raw errors are logged server-side only; users get stable friendly codes via `src/lib/auth-errors.ts` (never "PKCE"/"verifier"). **Open-redirect fixed**: `next` is validated to same-origin absolute paths (`//evil.com`, absolute URLs, backslashes → `/`).
+- **Duplicate-identity audit**: exactly one auth user (email provider), one profile, one linked member (Snehil) — no duplicates. Google sign-in with the same verified email is expected to link to the existing user automatically (Supabase default); profiles key on user id, so no duplicate profile/member is possible app-side.
+- **Tests**: +7 unit (error classification, no-jargon copy guard, open-redirect matrix) and `npm run test:auth` — 6/6 live checks: single profile on signup, real 8-digit OTP verify, reused/wrong code rejected, `token_hash` verify with no verifier present.
+
 ## [Unreleased] — Stage 3: forensics + completion (branch `feature/auth-multi-trip`)
 
 - **Diagnosed the "Anshul / permission denied / network error" report**: the user was on production (`main`, pre-auth build), which broke by design when the RLS cutover removed anon access, and which greets from the legacy localStorage identity. The feature branch was already correct; production heals on merge.

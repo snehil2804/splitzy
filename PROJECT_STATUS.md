@@ -2,6 +2,16 @@
 
 _Last updated: 2026-07-19 (**MERGED TO MAIN + DEPLOYED TO PRODUCTION** — `075a0ef`)_
 
+## 🔐 Auth Phase 1 on `feature/auth-multi-trip` (not merged): Google + email OTP
+
+New login flow (Google primary, same-screen 8-digit email code, magic link as in-email fallback) with a rewritten callback and friendly error codes. See CHANGELOG "Unreleased".
+
+**Manual Supabase dashboard steps still required (cannot be done via API):**
+1. **Email templates** (Authentication → Email Templates): the current default sends only a link. For the code flow the email must show the code, and for cross-context-safe links the URL must use the token-hash form. Update **Magic Link** (and **Confirm signup**, used for first-time-signup emails) to include, e.g.:
+   `<p>Your Splitzy code: <strong>{{ .Token }}</strong></p>`
+   `<p>Or tap: <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Sign in</a></p>`
+2. **Redirect URLs** (Authentication → URL Configuration): add `http://localhost:3777/**` (dev-server port; only :3000 is allow-listed today).
+
 ## ✅ Live in production (`splitzy-delta.vercel.app`)
 
 `feature/auth-multi-trip` merged to `main` (`075a0ef`) with the user's explicit approval and auto-deployed by Vercel. Post-deploy smoke test against the public production domain: `/` and `/settings` 307→`/login` when signed out, `/login` serves the new sign-in page (200), `/api/expenses` returns 401 unauthenticated. The old pre-auth build (and its "permission denied" / stale-identity symptoms) is gone. Remaining before full multi-user rollout: custom SMTP (built-in Supabase email is ~2/hour and team-addresses-only), then invite Shruti & Anshul from `/trips` linking their guest identities.
