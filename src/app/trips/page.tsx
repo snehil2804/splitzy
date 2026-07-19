@@ -603,7 +603,7 @@ export default function TripsPage() {
                     type="email"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="Email (optional — restricts who can claim it)"
+                    placeholder="Their email (optional, just for your records)"
                     className="min-h-12 w-full rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-brand"
                   />
                   <button

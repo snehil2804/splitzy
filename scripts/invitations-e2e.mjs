@@ -201,6 +201,59 @@ try {
   const { data: leak } = await second.from("expenses").select("id").eq("trip_id", tripId);
   ok("a non-member cannot read the trip's expenses", (leak ?? []).length === 0);
 
+  // ── regression: the frontend used to fire accept_my_invitations() (the
+  //    email-matched auto-claim) on every login, racing /join's explicit
+  //    claim_invitation() whenever an invite carried a matching email —
+  //    reported as "invite link expired/revoked" despite a real, correct
+  //    claim having already happened. That auto-call is now removed from
+  //    useSession.ts; this proves the DB-level contract stays safe even if
+  //    something *does* call accept_my_invitations() first: the member
+  //    still gets linked correctly, and claim_invitation() on the same
+  //    token afterward fails cleanly (no corruption, no crash) rather than
+  //    double-claiming or leaving inconsistent state. ─────────────────────
+  const { data: gid3, error: g3Err } = await owner.rpc("add_guest_member", {
+    p_trip_id: tripId,
+    p_name: `E2E Guest 3 ${Date.now()}`,
+  });
+  if (g3Err) throw g3Err;
+  const guestId3 = gid3;
+  const thirdEmail = `splitzy-inv-third-${Date.now()}@example.com`;
+  const { data: token3, error: inv3Err } = await owner.rpc("invite_member", {
+    p_trip_id: tripId,
+    p_member_id: guestId3,
+    p_email: thirdEmail,
+  });
+  if (inv3Err) throw inv3Err;
+  const { data: invRow3 } = await admin.from("invitations").select("id").eq("token", token3).single();
+  invitationIds.push(invRow3.id);
+
+  const { data: thirdCreated, error: tErr } = await admin.auth.admin.createUser({
+    email: thirdEmail,
+    email_confirm: true,
+  });
+  if (tErr) throw tErr;
+  const thirdUserId = thirdCreated.user.id;
+  const third = await sessionFor(thirdEmail);
+
+  // Simulate the old background path racing ahead of /join's own claim.
+  const { error: autoAcceptErr } = await third.rpc("accept_my_invitations");
+  ok("accept_my_invitations still claims by matching email (legacy path intact)", !autoAcceptErr, autoAcceptErr?.message ?? "");
+
+  const { data: autoLinked } = await admin.from("members").select("user_id").eq("id", guestId3).single();
+  ok("...and correctly links the member", autoLinked?.user_id === thirdUserId);
+
+  const { error: raceClaimErr } = await third.rpc("claim_invitation", { p_token: token3 });
+  ok(
+    "claim_invitation() on the now-already-accepted token fails cleanly, no corruption",
+    Boolean(raceClaimErr) && /invalid or has already been used/i.test(raceClaimErr?.message ?? ""),
+    raceClaimErr?.message ?? "",
+  );
+
+  await admin.from("trip_members").delete().eq("trip_id", tripId).eq("member_id", guestId3);
+  await admin.from("members").delete().eq("id", guestId3);
+  await admin.auth.admin.deleteUser(thirdUserId);
+  await third.auth.signOut();
+
   await owner.auth.signOut();
   await claimant.auth.signOut();
   await second.auth.signOut();

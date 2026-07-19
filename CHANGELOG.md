@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased] — Invitations & member claiming (branch `feature/invitations`)
+## [Unreleased] — Fix: invite claim race with matching email (branch `feature/invitations`)
+
+**Root cause**: `useSession.ts` auto-fired the legacy `accept_my_invitations()` (email-matched auto-claim) on *every* login, racing `/join/[token]`'s explicit `claim_invitation()` whenever an invite carried an email matching the signer's own — both targeted the same row on the same sign-in event. Confirmed in the DB: the affected invitation showed `status: 'accepted'`, `accepted_by: null` — proof the background path (which never sets `accepted_by`) won the race, correctly linked the member, then `/join` found a non-pending row and showed "invite expired/revoked" even though the user was already correctly joined. No data corruption at any point — purely a confusing UI outcome from two correct mechanisms competing.
+
+**Fix** (3 files, no SQL/RLS changes): removed the automatic background call in `useSession.ts` — `claim_invitation()` via the link is now the single source of truth for claiming. Fixed the invite form's email-field placeholder, which claimed the email "restricts who can claim it" (never true — `claim_invitation` was always token-only by design) to reflect its actual purpose (owner's own record-keeping). Added a regression case to `npm run test:invitations` (now 16/16) that simulates the old race at the DB level and proves it now fails cleanly with no corruption.
+
+## [Invitations] — shareable invite links (branch `feature/invitations`)
 
 Shareable invite links replace the email-only auto-claim flow (kept as an optional secondary path). Migration `20260720120000_invitation_tokens`, additive — 1 pre-existing (already-revoked) invitation row backfilled a token via column default, no other data touched.
 
