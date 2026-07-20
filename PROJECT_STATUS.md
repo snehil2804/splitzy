@@ -1,6 +1,24 @@
 # Project Status
 
-_Last updated: 2026-07-20 (Expense Details preview + creator-only edit permissions — merged and live in production)_
+_Last updated: 2026-07-21 (Stage 4 — premium desktop UX refinement — merged and live in production)_
+
+## ✅ Stage 4: premium desktop UX refinement — MERGED AND LIVE
+
+Full UX audit against a desktop-SaaS quality bar (Notion/Linear/Slack/GitHub/Revolut Web), then a prioritized implementation pass. Mobile/PWA behavior below the `md` breakpoint is unchanged; colors, branding, and all business logic (auth, balances, settlements, expense logic, smart location, permissions, invitations, schema) untouched.
+
+**Critical**: the entire app had zero responsive breakpoints anywhere (confirmed via grep) — a single fixed `max-w-md` column on every viewport. `layout.tsx` now widens progressively at `md`/`lg`, capped so line length stays readable on ultrawide monitors. New persistent desktop `Sidebar` (hidden on mobile; `TabBar` is now the exclusive mobile pattern, hidden at `md`+) surfaces every destination (previously `/trips`, `/activity`, `/profile` were multiple taps deep) plus a prominent Add-expense action and account chip — reuses `useTripData()`/`useSession()`, no new data-fetching path. Global `:focus-visible` ring added (previously nonexistent anywhere). New `useDialogA11y` hook (ESC-to-close, reference-counted body-scroll-lock so stacked dialogs don't unlock each other prematurely, focus moved in on open and restored to the trigger on close, Tab trapped in the topmost dialog) applied to `ConfirmSheet`, `ExpenseDetailSheet`, and `LocationPicker` — the latter two previously had neither ESC-to-close nor scroll-lock. Confirmation dialogs default focus to the safe/cancel action, never the destructive one.
+
+**High**: dialogs dock to the bottom on mobile (unchanged) and center with a fade-scale-in on desktop instead of a bottom sheet stuck to a giant screen. Hover states added across every interactive surface that lacked one (new `.glass-interactive` utility, hover-capable pointers only so it never sticks after a mobile tap). Dashboard settlements + recent expenses sit side by side at `lg` widths.
+
+**Medium**: sticky day-group headers on the Expenses list; page-title heading scale bumped at `md`+.
+
+**Post-preview fixes from a physical iPhone review**: the bottom nav was a translucent floating pill with page content visible through it and a visible gap below it before the true screen edge — rewritten as a flush, ~95%-opaque, edge-to-edge bar with a top hairline border (the native iOS tab-bar pattern), its own background now absorbing the safe-area inset instead of leaving a gap beneath it; `--tabbar-clearance` tightened from `6.5rem` to `5rem` to match. Pinch-to-zoom and double-tap-zoom disabled via the standard `maximumScale`/`userScalable` fields on the Next.js `Viewport` export (confirmed in the built HTML's `<meta name="viewport">` tag) — not a JS touch-event hack. "Paytm" payment-app suggestion chip swapped for "Card".
+
+**Verification**: `lint`, `tsc --noEmit`, 52/52 unit tests, and a production build all clean on every commit in this stage; secret-key bundle grep clean. Interactive browser-automation tooling was unavailable for the entire session (Chrome extension unresponsive despite multiple retries and a user-side check), so this was verified via full diff review instead — one real bug was caught and fixed this way (dialog initial focus defaulting to the destructive action instead of the safe one). The primary verification was the user's own review of the Vercel Preview, including a physical iPhone pass that surfaced the two post-preview fixes above.
+
+**Merged and deployed (2026-07-21)**: pushed to `origin/feature/stage4-ux-refinement`, two rounds of Vercel Preview review (first pass, then the iPhone-review fixes), merged to `main` (`1a87b56`) with the user's explicit approval and auto-deployed by Vercel — production status check came back `success`. Post-merge smoke check: `splitzy-delta.vercel.app/` and `/expenses` both `307`→`/login` unauthenticated as expected, `/login` `200` with the pinch-zoom-disabled viewport meta tag confirmed live in the production HTML.
+
+_Previous entry below._
 
 ## ✅ Expense Details preview + creator-only edit permissions — MERGED AND LIVE
 

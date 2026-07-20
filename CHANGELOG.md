@@ -1,5 +1,17 @@
 # Changelog
 
+## [Stage 4] — premium desktop UX refinement (`main` @ `1a87b56`)
+
+Desktop-SaaS-quality pass (Notion/Linear/Slack/GitHub/Revolut Web bar) on top of the existing mobile-first design — mobile/PWA behavior below `md` is unchanged, colors/branding/business logic untouched.
+
+- Root cause of every desktop shortcoming: zero responsive breakpoints anywhere in the codebase (a single fixed `max-w-md` column). `layout.tsx` now widens progressively at `md`/`lg`, capped for readable line length on ultrawide monitors
+- New persistent desktop `Sidebar.tsx` (`md`+, hidden on mobile) — wordmark, prominent Add-expense action, full nav (previously `/trips`/`/activity`/`/profile` were multiple taps deep), account chip; reuses `useTripData()`/`useSession()`. `TabBar` is now the exclusive mobile pattern (`md:hidden`)
+- Global `:focus-visible` ring (keyboard-only); new `useDialogA11y` hook (ESC-to-close, reference-counted scroll-lock so stacked dialogs — e.g. a delete confirmation opened from within the expense detail sheet — don't unlock each other prematurely, focus moved in/restored, Tab-trapped to the topmost dialog) applied to `ConfirmSheet`/`ExpenseDetailSheet`/`LocationPicker`, the latter two previously having neither ESC-to-close nor scroll-lock at all; confirmation dialogs default focus to the safe action, never the destructive one
+- Dialogs dock to the bottom on mobile, center with a fade-scale-in at `md`+ instead of a bottom sheet stuck to a full desktop viewport
+- Hover states added throughout (new `.glass-interactive` utility, hover-capable pointers only) on every clickable surface that lacked one; dashboard settlements + recent expenses sit side by side at `lg`; sticky day-group headers on Expenses; page-title heading scale bumped at `md`+
+- Two fixes from a physical iPhone review of the preview: `TabBar` rewritten from a translucent floating pill (content visible through it, a visible gap below it) to a flush, ~95%-opaque, edge-to-edge bar whose own background absorbs the safe-area inset (`--tabbar-clearance` `6.5rem` → `5rem` to match); pinch/double-tap zoom disabled via `maximumScale`/`userScalable` on the Next.js `Viewport` export (confirmed in the built HTML's `<meta name="viewport">`, not a JS hack). Also swapped the "Paytm" payment-app suggestion for "Card"
+- Verification: `lint`/`tsc --noEmit`/52-52 unit tests/`build` clean throughout; secret-key bundle grep clean. Interactive browser automation was unavailable all session, so this was verified via full diff review (catching one real bug: dialog initial focus defaulting to the destructive action) plus the user's own review of two rounds of Vercel Preview, including a physical-device pass
+
 ## [Expense Details] — click-to-preview + creator-only edit permissions (`main` @ `5000bed`)
 
 Clicking any expense (whole card, keyboard-accessible) opens a bottom-sheet preview showing exactly what was saved, with "Paid by" (the trip-member payer) and "Logged by" (the authenticated creator) always shown as distinct sections — never conflated. Full split breakdown, payment app, location (name + formatted address, lat/lng only in a collapsible "Technical details" section alongside the expense ID and created/updated timestamps), and trip name. Query-param-driven (`?view=<id>`) so the browser back button closes it correctly.
