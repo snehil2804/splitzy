@@ -56,7 +56,7 @@ export default function DashboardPage() {
         </p>
         <Link
           href="/trips"
-          className="tap mt-1 inline-flex items-center gap-1.5 text-2xl font-bold tracking-tight"
+          className="tap mt-1 inline-flex items-center gap-1.5 text-2xl font-bold tracking-tight transition-opacity hover:opacity-80 md:text-3xl"
         >
           {data?.trip ? data.trip.name : "Your trips"}
           <ChevronRightIcon className="mt-1 size-5 text-ink-faint" />
@@ -85,7 +85,7 @@ export default function DashboardPage() {
           action={
             <Link
               href="/trips"
-              className="tap mt-2 inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/25"
+              className="tap mt-2 inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl"
             >
               <PlusIcon className="size-4" strokeWidth={2.4} />
               Create a trip
@@ -138,66 +138,72 @@ export default function DashboardPage() {
             </section>
           )}
 
-          {/* Settlements */}
-          <section
-            className="anim-fade-up glass rounded-3xl p-5"
-            style={{ animationDelay: "120ms" }}
-          >
-            <div className="mb-3.5 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-ink-muted">
-                Settling up
-              </h2>
-              <Link
-                href="/balances"
-                className="tap flex items-center gap-0.5 text-xs font-semibold text-brand"
-              >
-                Details
-                <ChevronRightIcon className="size-3.5" />
-              </Link>
-            </div>
-            <SettlementList
-              settlements={derived.settlements}
-              balances={derived.balances}
-              identity={myMember?.name ?? null}
-            />
-          </section>
-
-          {/* Recent expenses */}
-          <section className="anim-fade-up" style={{ animationDelay: "180ms" }}>
-            <div className="mb-3 flex items-center justify-between px-1">
-              <h2 className="text-sm font-semibold text-ink-muted">
-                Recent expenses
-              </h2>
-              {data.expenses.length > RECENT_COUNT && (
+          {/* Settlements + recent expenses sit side by side at lg widths,
+              stacked on mobile/tablet — the wrapper's own `space-y-6` (undone
+              via `lg:space-y-0`, replaced by the grid's own `gap-6`) keeps the
+              existing mobile spacing untouched. */}
+          <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+            {/* Settlements */}
+            <section
+              className="anim-fade-up glass rounded-3xl p-5"
+              style={{ animationDelay: "120ms" }}
+            >
+              <div className="mb-3.5 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-ink-muted">
+                  Settling up
+                </h2>
                 <Link
-                  href="/expenses"
-                  className="tap flex items-center gap-0.5 text-xs font-semibold text-brand"
+                  href="/balances"
+                  className="tap flex items-center gap-0.5 text-xs font-semibold text-brand transition-opacity hover:opacity-70"
                 >
-                  See all
+                  Details
                   <ChevronRightIcon className="size-3.5" />
                 </Link>
-              )}
-            </div>
-            {derived.recent.length === 0 ? (
-              <EmptyState
-                emoji="🌴"
-                title="No expenses yet"
-                message="The first chai, cab or hotel you log will show up here."
-              />
-            ) : (
-              <div className="space-y-3">
-                {derived.recent.map((expense, i) => (
-                  <ExpenseCard
-                    key={expense.id}
-                    expense={expense}
-                    membersById={derived.membersById}
-                    compact
-                    index={i}
-                  />
-                ))}
               </div>
-            )}
-          </section>
+              <SettlementList
+                settlements={derived.settlements}
+                balances={derived.balances}
+                identity={myMember?.name ?? null}
+              />
+            </section>
+
+            {/* Recent expenses */}
+            <section className="anim-fade-up" style={{ animationDelay: "180ms" }}>
+              <div className="mb-3 flex items-center justify-between px-1">
+                <h2 className="text-sm font-semibold text-ink-muted">
+                  Recent expenses
+                </h2>
+                {data.expenses.length > RECENT_COUNT && (
+                  <Link
+                    href="/expenses"
+                    className="tap flex items-center gap-0.5 text-xs font-semibold text-brand transition-opacity hover:opacity-70"
+                  >
+                    See all
+                    <ChevronRightIcon className="size-3.5" />
+                  </Link>
+                )}
+              </div>
+              {derived.recent.length === 0 ? (
+                <EmptyState
+                  emoji="🌴"
+                  title="No expenses yet"
+                  message="The first chai, cab or hotel you log will show up here."
+                />
+              ) : (
+                <div className="space-y-3">
+                  {derived.recent.map((expense, i) => (
+                    <ExpenseCard
+                      key={expense.id}
+                      expense={expense}
+                      membersById={derived.membersById}
+                      compact
+                      index={i}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
 
           {/* Quick actions */}
           <section
@@ -206,14 +212,14 @@ export default function DashboardPage() {
           >
             <Link
               href="/add"
-              className="tap flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand/25"
+              className="tap flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl"
             >
               <PlusIcon className="size-4" strokeWidth={2.4} />
               Add expense
             </Link>
             <Link
               href="/balances"
-              className="tap glass flex min-h-12 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold"
+              className="tap glass glass-interactive flex min-h-12 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold"
             >
               <ScaleIcon className="size-4" />
               Balances

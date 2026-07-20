@@ -48,7 +48,7 @@ export default function BalancesPage() {
   return (
     <div className="space-y-6">
       <header className="anim-fade-up pt-2">
-        <h1 className="text-2xl font-bold tracking-tight">Balances</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Balances</h1>
         <p className="mt-1 text-sm text-ink-muted">
           Who paid, who owes, and the fastest way to settle.
         </p>

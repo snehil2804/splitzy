@@ -18,7 +18,7 @@ import type { LocationInput, SplitType } from "@/lib/types";
 
 type SplitMode = "everyone" | "custom";
 
-const PAYMENT_SUGGESTIONS = ["Cash", "GPay", "PhonePe", "Paytm"];
+const PAYMENT_SUGGESTIONS = ["Cash", "GPay", "PhonePe", "Card"];
 
 /**
  * Manual Add/Edit Expense form. Calls `add_expense()`/`edit_expense()`,
@@ -380,7 +380,7 @@ function AddExpenseFlow() {
   return (
     <div className="space-y-6 pb-4">
       <header className="anim-fade-up pt-2">
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
           {isEditing ? "Edit expense" : "Add expense"}
         </h1>
         <p className="mt-1 text-sm text-ink-muted">For {trip.name}</p>
@@ -443,7 +443,7 @@ function AddExpenseFlow() {
                   className={`tap flex flex-col items-center gap-2 rounded-2xl border-2 py-4 transition-colors ${
                     selected
                       ? "border-brand bg-brand-soft"
-                      : "border-transparent bg-line/60"
+                      : "border-transparent bg-line/60 hover:bg-line"
                   }`}
                 >
                   <Avatar name={m.name} size="md" />
@@ -471,7 +471,7 @@ function AddExpenseFlow() {
               className={`tap rounded-xl py-2.5 text-xs font-semibold transition-colors ${
                 splitMode === "everyone"
                   ? "bg-surface-strong text-brand shadow-sm"
-                  : "text-ink-muted"
+                  : "text-ink-muted hover:text-ink"
               }`}
             >
               Everyone
@@ -483,7 +483,7 @@ function AddExpenseFlow() {
               className={`tap rounded-xl py-2.5 text-xs font-semibold transition-colors ${
                 splitMode === "custom"
                   ? "bg-surface-strong text-brand shadow-sm"
-                  : "text-ink-muted"
+                  : "text-ink-muted hover:text-ink"
               }`}
             >
               Choose people
@@ -503,7 +503,7 @@ function AddExpenseFlow() {
                     className={`tap relative flex flex-col items-center gap-2 rounded-2xl border-2 py-4 transition-colors ${
                       selected
                         ? "border-brand bg-brand-soft"
-                        : "border-transparent bg-line/60"
+                        : "border-transparent bg-line/60 hover:bg-line"
                     }`}
                   >
                     {selected && (
@@ -584,7 +584,7 @@ function AddExpenseFlow() {
                   className={`tap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
                     paymentApp === option
                       ? "bg-brand text-white"
-                      : "bg-line/60 text-ink-muted"
+                      : "bg-line/60 text-ink-muted hover:bg-line"
                   }`}
                 >
                   {option}
@@ -608,7 +608,7 @@ function AddExpenseFlow() {
             <button
               type="button"
               onClick={() => setPickerOpen(true)}
-              className="tap mt-2 flex w-full items-center gap-3 rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-left text-sm outline-none transition-colors focus:border-brand"
+              className="tap mt-2 flex w-full items-center gap-3 rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-left text-sm outline-none transition-colors hover:bg-line focus:border-brand"
             >
               {locationSource === "auto" ? (
                 <CrosshairIcon className="size-4 shrink-0 text-brand" />
@@ -646,7 +646,7 @@ function AddExpenseFlow() {
         <button
           type="submit"
           disabled={submitting}
-          className="tap w-full rounded-2xl bg-gradient-to-br from-brand to-accent py-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+          className="tap w-full rounded-2xl bg-gradient-to-br from-brand to-accent py-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60 disabled:hover:shadow-lg"
         >
           {submitting
             ? isEditing
@@ -677,7 +677,7 @@ function AddExpenseFlow() {
 function Header({ editing }: { editing: boolean }) {
   return (
     <header className="anim-fade-up pt-2">
-      <h1 className="text-2xl font-bold tracking-tight">
+      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
         {editing ? "Edit expense" : "Add expense"}
       </h1>
     </header>

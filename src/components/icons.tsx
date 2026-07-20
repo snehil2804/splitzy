@@ -247,6 +247,24 @@ export function ShareIcon(props: IconProps) {
   );
 }
 
+export function ActivityIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 12h4l2-6.5 4 13 2-6.5h6" />
+    </Icon>
+  );
+}
+
+export function SuitcaseIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="7.5" width="17" height="12" rx="2" />
+      <path d="M9 7.5V5.8A1.3 1.3 0 0 1 10.3 4.5h3.4A1.3 1.3 0 0 1 15 5.8V7.5" />
+      <path d="M3.5 13h17" />
+    </Icon>
+  );
+}
+
 export function SparklesIcon(props: IconProps) {
   return (
     <Icon {...props}>

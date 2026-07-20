@@ -115,7 +115,7 @@ export default function ProfilePage() {
               <button
                 type="submit"
                 disabled={saving || !displayName.trim()}
-                className="tap shrink-0 rounded-2xl bg-brand px-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+                className="tap shrink-0 rounded-2xl bg-brand px-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
               >
                 {saving ? "…" : "Save"}
               </button>
@@ -135,7 +135,7 @@ export default function ProfilePage() {
             <button
               onClick={handleSignOut}
               disabled={signingOut}
-              className="tap mt-3 min-h-12 w-full rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative disabled:opacity-60"
+              className="tap mt-3 min-h-12 w-full rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative transition-colors hover:bg-negative/15 disabled:opacity-60"
             >
               {signingOut ? "Signing out…" : "Sign out"}
             </button>
@@ -149,7 +149,7 @@ export default function ProfilePage() {
 function Header() {
   return (
     <header className="anim-fade-up pt-2">
-      <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
+      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Profile</h1>
       <p className="mt-1 text-sm text-ink-muted">Who you are across trips.</p>
     </header>
   );

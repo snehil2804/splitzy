@@ -26,7 +26,7 @@ function ExpensesShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="space-y-6">
       <header className="anim-fade-up pt-2">
-        <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Expenses</h1>
       </header>
       {children}
     </div>
@@ -103,7 +103,7 @@ function ExpensesFlow() {
   return (
     <div className="space-y-6">
       <header className="anim-fade-up pt-2">
-        <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Expenses</h1>
         {status === "ready" && data && data.expenses.length > 0 && (
           <p className="mt-1 text-sm text-ink-muted">
             {data.expenses.length}{" "}
@@ -129,7 +129,7 @@ function ExpensesFlow() {
       {status === "ready" &&
         days.map((day) => (
           <section key={day.label + day.expenses[0]?.id}>
-            <h2 className="mb-2.5 px-1 text-xs font-semibold uppercase tracking-wider text-ink-faint">
+            <h2 className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-2.5 bg-canvas/90 px-5 py-2 text-xs font-semibold uppercase tracking-wider text-ink-faint backdrop-blur-sm md:-mx-10 md:px-11">
               {day.label}
             </h2>
             <div className="space-y-3">

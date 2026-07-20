@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 import {
   autocompletePlaces,
   checkPlacesConfigured,
@@ -62,6 +63,7 @@ export function LocationPicker({
   // brief same-origin round trip), true/false once known.
   const [placesConfigured, setPlacesConfigured] = useState<boolean | null>(null);
   const sessionToken = useRef(newSessionToken());
+  const dialogRef = useDialogA11y(true, onClose);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,7 +150,7 @@ export function LocationPicker({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-50 flex items-end justify-center md:items-center"
       role="dialog"
       aria-modal="true"
       aria-label="Choose a location"
@@ -159,7 +161,11 @@ export function LocationPicker({
         onClick={onClose}
         className="anim-fade-in absolute inset-0 bg-black/40 backdrop-blur-[2px]"
       />
-      <div className="anim-sheet-up glass relative flex max-h-[85vh] w-full max-w-sm flex-col rounded-t-[2rem] pb-[env(safe-area-inset-bottom)]">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="anim-dialog-in glass relative flex max-h-[85vh] w-full max-w-sm flex-col rounded-t-[2rem] pb-[env(safe-area-inset-bottom)] outline-none md:max-w-md md:rounded-[2rem] md:pb-0"
+      >
         <div className="flex items-center justify-between px-5 pt-5">
           <h2 className="text-lg font-semibold">Location</h2>
           <button

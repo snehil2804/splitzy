@@ -50,7 +50,7 @@ function Header() {
       <div className="mx-auto grid size-16 place-items-center rounded-[1.75rem] bg-gradient-to-br from-brand to-accent text-white shadow-xl shadow-brand/25">
         <MailIcon className="size-7" strokeWidth={2} />
       </div>
-      <h1 className="mt-4 text-2xl font-bold tracking-tight">Sign in to Splitzy</h1>
+      <h1 className="mt-4 text-2xl font-bold tracking-tight md:text-3xl">Sign in to Splitzy</h1>
       <p className="mt-1 text-sm text-ink-muted">
         Split trips fairly — no passwords needed.
       </p>
@@ -199,7 +199,7 @@ function LoginFlow() {
                 setMessage(null);
                 setNotice(null);
               }}
-              className="tap font-semibold text-ink-muted"
+              className="tap font-semibold text-ink-muted transition-colors hover:text-ink"
             >
               Change email
             </button>
@@ -207,7 +207,7 @@ function LoginFlow() {
               type="button"
               onClick={() => sendCode(true)}
               disabled={cooldown > 0 || busy !== null}
-              className="tap font-semibold text-brand disabled:opacity-50"
+              className="tap font-semibold text-brand transition-opacity hover:opacity-70 disabled:opacity-50"
             >
               {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
             </button>
@@ -228,7 +228,7 @@ function LoginFlow() {
         <button
           type="submit"
           disabled={busy !== null || otp.length < OTP_MIN}
-          className="tap min-h-12 w-full rounded-2xl bg-gradient-to-br from-brand to-accent py-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+          className="tap min-h-12 w-full rounded-2xl bg-gradient-to-br from-brand to-accent py-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
         >
           {busy === "verify" ? "Verifying…" : "Verify and sign in"}
         </button>
@@ -241,7 +241,7 @@ function LoginFlow() {
       <button
         onClick={handleGoogle}
         disabled={busy !== null}
-        className="tap glass flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl py-3.5 text-sm font-semibold disabled:opacity-60"
+        className="tap glass glass-interactive flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl py-3.5 text-sm font-semibold disabled:opacity-60"
       >
         <GoogleIcon className="size-5" />
         {busy === "google" ? "Opening Google…" : "Continue with Google"}
@@ -289,7 +289,7 @@ function LoginFlow() {
         <button
           type="submit"
           disabled={busy !== null || !normalizedEmail}
-          className="tap min-h-12 w-full rounded-2xl bg-gradient-to-br from-brand to-accent py-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+          className="tap min-h-12 w-full rounded-2xl bg-gradient-to-br from-brand to-accent py-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
         >
           {busy === "send" ? "Sending…" : "Send verification code"}
         </button>

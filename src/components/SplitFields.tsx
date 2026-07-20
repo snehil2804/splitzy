@@ -48,7 +48,7 @@ export function SplitFields({
             className={`tap rounded-xl py-2 text-xs font-semibold transition-colors ${
               splitType === option.value
                 ? "bg-surface-strong text-brand shadow-sm"
-                : "text-ink-muted"
+                : "text-ink-muted hover:text-ink"
             }`}
           >
             {option.label}

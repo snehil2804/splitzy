@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import { Sidebar } from "@/components/Sidebar";
 import { TabBar } from "@/components/TabBar";
 import "./globals.css";
 
@@ -25,6 +26,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // No pinch/double-tap zoom — this is a native-feeling PWA, not a document
+  // meant to be zoomed. Every tap target is already sized for touch.
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   // Mobile keyboards shrink the layout instead of overlaying the tab bar
   // on top of focused inputs.
@@ -54,9 +59,12 @@ export default function RootLayout({
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <div aria-hidden className="app-glow pointer-events-none fixed inset-0" />
-        <main className="relative mx-auto min-h-dvh max-w-md px-4 pb-[var(--tabbar-clearance)] pt-[calc(1.25rem+env(safe-area-inset-top))]">
-          {children}
-        </main>
+        <div className="md:flex">
+          <Sidebar />
+          <main className="relative mx-auto min-h-dvh w-full max-w-md px-4 pb-[var(--tabbar-clearance)] pt-[calc(1.25rem+env(safe-area-inset-top))] md:max-w-3xl md:px-10 md:pb-16 md:pt-12 lg:max-w-4xl">
+            {children}
+          </main>
+        </div>
         <TabBar />
       </body>
     </html>
