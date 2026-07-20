@@ -134,7 +134,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isCacheableStaticAsset(pathname)) {
+  // The offline-shell routes are also warmed via a plain `fetch()` right
+  // after a successful online session (see OfflineCacheWarmer) — that
+  // request has mode "cors"/"same-origin", never "navigate", so it needs
+  // its own cache-first-and-store handling here to actually take effect.
+  if (OFFLINE_SHELL_PATHS.includes(pathname) || isCacheableStaticAsset(pathname)) {
     event.respondWith(handleStaticAsset(request));
   }
 });
