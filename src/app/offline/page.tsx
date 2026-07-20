@@ -8,8 +8,9 @@ import { EmptyState } from "@/components/StateViews";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useSession } from "@/hooks/useSession";
+import { expenseEmoji } from "@/lib/emoji";
 import { formatFullDateTime, formatINR } from "@/lib/format";
-import { getLatestReferenceDataForUser } from "@/lib/offlineDb";
+import { getLatestReferenceDataForUser, hasQueuedExpensesForOtherUser } from "@/lib/offlineDb";
 import { syncPendingExpenses } from "@/lib/offlineSync";
 import type { OfflineExpense, OfflineReferenceData } from "@/lib/offlineTypes";
 
@@ -39,6 +40,7 @@ export default function OfflinePage() {
   const [manualSyncResult, setManualSyncResult] = useState<{ synced: number; failed: number } | null>(
     null,
   );
+  const [otherAccountHasQueue, setOtherAccountHasQueue] = useState(false);
 
   const isSyncingNow = expenses.some((e) => e.sync_status === "syncing");
 
@@ -52,6 +54,19 @@ export default function OfflinePage() {
       cancelled = true;
     };
   }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    hasQueuedExpensesForOtherUser(userId).then((has) => {
+      if (!cancelled) setOtherAccountHasQueue(has);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Re-checked whenever this account's own queue changes size — a good,
+    // cheap proxy for "something on this device just changed."
+  }, [userId, expenses.length]);
 
   async function confirmDelete() {
     if (!pendingDelete) return;
@@ -117,6 +132,24 @@ export default function OfflinePage() {
     <div className="space-y-6">
       <Header online={online} isSyncingNow={isSyncingNow} pendingCount={pendingCount} failedCount={failedCount} />
 
+      {online && (
+        <Link
+          href="/"
+          className="tap anim-fade-up flex items-center justify-center gap-1.5 text-sm font-semibold text-brand transition-opacity hover:opacity-70"
+        >
+          Continue to Splitzy
+        </Link>
+      )}
+
+      {otherAccountHasQueue && (
+        <section className="anim-fade-up rounded-2xl bg-line/60 p-4 text-center">
+          <p className="text-xs leading-relaxed text-ink-muted">
+            Another account has offline expenses waiting on this device. Sign in as that account
+            to review or sync them — they&apos;re never shown or synced under a different account.
+          </p>
+        </section>
+      )}
+
       <section className="anim-fade-up glass rounded-3xl p-5 text-center">
         <p className="text-sm leading-relaxed text-ink-muted">
           {online
@@ -161,7 +194,11 @@ export default function OfflinePage() {
         {queueStatus === "loading" && <p className="mt-3 text-sm text-ink-muted">Loading…</p>}
 
         {queueStatus === "ready" && expenses.length === 0 && (
-          <p className="mt-3 text-sm text-ink-muted">Nothing queued yet.</p>
+          <EmptyState
+            emoji="🧳"
+            title="Nothing queued"
+            message="Expenses you save offline will show up here, waiting to sync."
+          />
         )}
 
         {queueStatus === "ready" && expenses.length > 0 && (
@@ -171,6 +208,9 @@ export default function OfflinePage() {
                 key={e.local_id}
                 className="flex items-center gap-3 rounded-2xl bg-line/60 px-4 py-3"
               >
+                <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-brand-soft text-lg">
+                  {expenseEmoji(e.description)}
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{e.description}</p>
                   <p className="mt-0.5 text-xs text-ink-muted">
@@ -212,6 +252,13 @@ export default function OfflinePage() {
         Trip and member information last updated on{" "}
         {formatFullDateTime(new Date(reference.cached_at))}.
       </p>
+
+      {pendingCount > 0 && (
+        <p className="text-center text-xs text-ink-faint">
+          Clearing this browser&apos;s site data, or deleting the app, removes anything not yet
+          synced — sync before doing either.
+        </p>
+      )}
 
       <ConfirmSheet
         open={pendingDelete !== null}

@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
+import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { CardSkeleton } from "@/components/Skeleton";
 import { SetupNotice } from "@/components/StateViews";
+import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 import { signOut, useSession } from "@/hooks/useSession";
 import { useTripData } from "@/hooks/useTripData";
 import { fetchMyProfile, updateDisplayName } from "@/lib/queries";
@@ -15,6 +17,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { status: sessionStatus, session } = useSession();
   const { data } = useTripData();
+  const { pendingCount: offlinePendingCount } = useOfflineQueue(session?.user.id ?? null);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -22,6 +25,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
 
   useEffect(() => {
     if (sessionStatus !== "authenticated") return;
@@ -48,7 +52,16 @@ export default function ProfilePage() {
     }
   }
 
+  function requestSignOut() {
+    if (offlinePendingCount > 0) {
+      setConfirmingSignOut(true);
+      return;
+    }
+    void handleSignOut();
+  }
+
   async function handleSignOut() {
+    setConfirmingSignOut(false);
     setSigningOut(true);
     await signOut();
     router.push("/login");
@@ -133,7 +146,7 @@ export default function ProfilePage() {
           >
             <h2 className="text-sm font-semibold">Account</h2>
             <button
-              onClick={handleSignOut}
+              onClick={requestSignOut}
               disabled={signingOut}
               className="tap mt-3 min-h-12 w-full rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative transition-colors hover:bg-negative/15 disabled:opacity-60"
             >
@@ -142,6 +155,20 @@ export default function ProfilePage() {
           </section>
         </>
       )}
+
+      <ConfirmSheet
+        open={confirmingSignOut}
+        title="Sign out with expenses still pending?"
+        message={`You have ${offlinePendingCount} offline ${offlinePendingCount === 1 ? "expense" : "expenses"} on this device that ${offlinePendingCount === 1 ? "hasn't" : "haven't"} synced yet. They'll stay saved here, but only this account can sync or manage them — sign back in to finish.`}
+        confirmLabel="Sign out anyway"
+        busyLabel="Signing out…"
+        cancelLabel="Stay signed in"
+        busy={signingOut}
+        onConfirm={handleSignOut}
+        onCancel={() => {
+          if (!signingOut) setConfirmingSignOut(false);
+        }}
+      />
     </div>
   );
 }
