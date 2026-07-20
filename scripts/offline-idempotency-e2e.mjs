@@ -49,6 +49,21 @@ let ownerClient, strangerClient;
  * constraint instead of erroring. `delete_trip()` is the real, FK-safe,
  * atomic removal path (owner-only) and is what must be used here too.
  */
+/**
+ * `delete_trip()` removes `trip_members` but deliberately never touches the
+ * standalone `members` row itself (identity persists across trips) — that
+ * row's `user_id` FK has no cascade, so deleting the auth user while it
+ * still exists fails. Must be removed first, and the deleteUser result
+ * must actually be checked — the Admin API does not throw on failure.
+ */
+async function deleteTestUser(userId) {
+  if (!userId) return;
+  const { error: memberErr } = await admin.from("members").delete().eq("user_id", userId);
+  if (memberErr) console.error(`cleanup: failed to delete member row for ${userId}:`, memberErr.message);
+  const { error: userErr } = await admin.auth.admin.deleteUser(userId);
+  if (userErr) console.error(`cleanup: failed to delete auth user ${userId}:`, userErr.message);
+}
+
 async function cleanup() {
   if (tripId && ownerClient) {
     const { error } = await ownerClient.rpc("delete_trip", { p_trip_id: tripId });
@@ -58,8 +73,8 @@ async function cleanup() {
     const { error } = await strangerClient.rpc("delete_trip", { p_trip_id: strangerTripId });
     if (error) console.error("cleanup: failed to delete stranger test trip:", error.message);
   }
-  if (ownerUserId) await admin.auth.admin.deleteUser(ownerUserId);
-  if (strangerUserId) await admin.auth.admin.deleteUser(strangerUserId);
+  await deleteTestUser(ownerUserId);
+  await deleteTestUser(strangerUserId);
   console.log("cleanup: all test artifacts removed");
 }
 

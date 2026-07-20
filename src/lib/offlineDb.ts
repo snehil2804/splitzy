@@ -35,6 +35,25 @@ const DB_VERSION = 1;
 
 let dbPromise: Promise<IDBPDatabase<OfflineSchema>> | null = null;
 
+/**
+ * Test-only: closes the cached connection and deletes the underlying
+ * database, so each test file/group can start from a clean slate. Never
+ * called by app code.
+ */
+export async function __resetForTests(): Promise<void> {
+  if (dbPromise) {
+    const db = await dbPromise;
+    db.close();
+  }
+  dbPromise = null;
+  await new Promise<void>((resolve, reject) => {
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => resolve();
+  });
+}
+
 function getDb(): Promise<IDBPDatabase<OfflineSchema>> {
   dbPromise ??= openDB<OfflineSchema>(DB_NAME, DB_VERSION, {
     upgrade(db) {
