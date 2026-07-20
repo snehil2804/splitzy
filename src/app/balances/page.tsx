@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { InfoIcon } from "@/components/icons";
 import { SettlementList } from "@/components/SettlementList";
 import { CardSkeleton } from "@/components/Skeleton";
 import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
@@ -175,9 +176,13 @@ export default function BalancesPage() {
                 className="anim-fade-up glass rounded-3xl p-5"
                 style={{ animationDelay: "200ms" }}
               >
-                <h2 className="mb-3.5 text-sm font-semibold text-ink-muted">
-                  How to settle up
-                </h2>
+                <h2 className="text-sm font-semibold text-ink-muted">How to settle up</h2>
+                <p className="mb-3.5 mt-1 flex items-start gap-1.5 text-xs leading-relaxed text-ink-faint">
+                  <InfoIcon className="mt-0.5 size-3.5 shrink-0" />
+                  Optimized across all trip expenses to minimize the number of payments —
+                  the suggested payer may differ from who you originally split a specific
+                  expense with. Tap a row for details.
+                </p>
                 <SettlementList
                   settlements={derived.settlements}
                   identity={myName}

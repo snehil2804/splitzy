@@ -58,7 +58,7 @@ async function claimGuest(ownerClient, tripId, name, email) {
 
 let ownerUserId, memberUserId, strangerUserId;
 let tripId;
-let ownerMemberId, memberMemberId;
+let ownerMemberId, memberMemberId, lateJoinerId;
 let owner, member, stranger;
 
 try {
@@ -124,6 +124,45 @@ try {
     equalParts?.length === 2 &&
       equalParts.every((p) => Number(p.share_amount) === 450) &&
       equalSum === 900,
+  );
+
+  // ── 1b. regression: a member who joins after an expense was created is
+  //    never retroactively added to it. Nothing in add_expense()/edit_expense()
+  //    defaults participants to "everyone" server-side — the caller must pass
+  //    an explicit p_participant_ids array — and no trigger touches
+  //    expense_participants on trip_members changes, so a late joiner can only
+  //    ever end up on a pre-existing expense via an explicit edit_expense()
+  //    call naming them. This reproduces the exact shape of the Dharamshala
+  //    trip's "Test Dinner" expense (created before "Snehiltest" joined). ───
+  const { data: lateJoinerIdResult, error: lateJoinerErr } = await owner.rpc("add_guest_member", {
+    p_trip_id: tripId,
+    p_name: `E2E Late Joiner ${Date.now()}`,
+  });
+  if (lateJoinerErr) throw lateJoinerErr;
+  lateJoinerId = lateJoinerIdResult;
+
+  const { data: equalPartsAfterLateJoin } = await admin
+    .from("expense_participants")
+    .select("member_id")
+    .eq("expense_id", equalExpenseId);
+  ok(
+    "a member added to the trip after an expense was created is not retroactively added to that expense",
+    equalPartsAfterLateJoin?.length === 2 &&
+      !equalPartsAfterLateJoin.some((p) => p.member_id === lateJoinerId),
+  );
+
+  const { error: addExpenseNoParticipantsErr } = await owner.rpc("add_expense", {
+    p_trip_id: tripId,
+    p_paid_by: ownerMemberId,
+    p_amount: 100,
+    p_description: "No participants specified",
+    p_participant_ids: [],
+    p_split_type: "equal",
+  });
+  ok(
+    "add_expense has no implicit 'everyone' fallback — an empty participant list is rejected, not silently expanded",
+    Boolean(addExpenseNoParticipantsErr),
+    addExpenseNoParticipantsErr?.message ?? "",
   );
 
   // ── 2. exact split ────────────────────────────────────────────────────
@@ -493,6 +532,7 @@ try {
     }
     if (ownerMemberId) await admin.from("members").delete().eq("id", ownerMemberId);
     if (memberMemberId) await admin.from("members").delete().eq("id", memberMemberId);
+    if (lateJoinerId) await admin.from("members").delete().eq("id", lateJoinerId);
     for (const uid of [ownerUserId, memberUserId, strangerUserId]) {
       if (uid) await admin.auth.admin.deleteUser(uid);
     }
