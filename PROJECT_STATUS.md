@@ -1,8 +1,8 @@
 # Project Status
 
-_Last updated: 2026-07-20 (Stage 3 — trip lifecycle, expense splits, balances & settlements — on `feature/trip-expense-engine`, not merged)_
+_Last updated: 2026-07-20 (Stage 3 — trip lifecycle, expense splits, balances & settlements — merged and live in production)_
 
-## 💰 Stage 3: trip lifecycle, expense splits, balances & settlements (branch `feature/trip-expense-engine`)
+## ✅ Stage 3: trip lifecycle, expense splits, balances & settlements — MERGED AND LIVE
 
 Financial-engine stage: 4 expense split methods (equal/exact/percentage/shares), creator-or-owner edit/delete permissions, full trip lifecycle (transfer ownership, leave, hard delete), settlement recording with an optimized minimum-transaction algorithm, and an immutable activity feed. See CHANGELOG "Unreleased" for the complete change list; the CLAUDE.md "Stage 3 financial engine" bullet has the architecture summary.
 
@@ -10,9 +10,9 @@ Financial-engine stage: 4 expense split methods (equal/exact/percentage/shares),
 
 **Two pre-existing bugs found and fixed while wiring this in** (not new regressions — present before this stage): `computeBalances()` was being called without its `settlements` argument on both the dashboard and `/balances`, so recorded settlements never adjusted the displayed balances; `expenses` had an UPDATE RLS policy that let any trip member soft-delete any other member's expense, tightened to creator-or-owner alongside the new `edit_expense()` permission check.
 
-**Verification**: `npx tsc --noEmit` clean, `npm run lint` clean (0 errors, 0 warnings), `npm test` 31/31 unit (was 20 before this stage — added split-validation edge cases and a settlement-optimization case proving the zero-sum-partition pass beats naive greedy), `npm run test:trip-expense-engine` (new) 38/38 live checks against production, `npm run test:db`/`test:auth`/`test:invitations` re-run clean (17/6/24 — no regressions), `npm run build` clean (18 routes, all static except `/api/expenses`, `/auth/callback`, `/join/[token]`). Grepped `.next/static` for the secret key after the build — zero matches.
+**Verification before merge**: `npx tsc --noEmit` clean, `npm run lint` clean (0 errors, 0 warnings), `npm test` 31/31 unit (was 20 before this stage — added split-validation edge cases and a settlement-optimization case proving the zero-sum-partition pass beats naive greedy), `npm run test:trip-expense-engine` (new) 38/38 live checks against production, `npm run test:db`/`test:auth`/`test:invitations` re-run clean (17/6/24 — no regressions), `npm run build` clean (18 routes, all static except `/api/expenses`, `/auth/callback`, `/join/[token]`). Grepped `.next/static` for the secret key after the build — zero matches.
 
-**Pushed** to `origin/feature/trip-expense-engine` (`849be12`); Vercel Preview deployed successfully: `https://splitzy-5xt214dz0-snehils-projects-979efd30.vercel.app`. Not merged to `main` — awaiting a human walkthrough of the Preview and explicit approval, same as every prior stage.
+**Merged and deployed (2026-07-19)**: pushed to `origin/feature/trip-expense-engine` (`849be12`, then a docs commit `d18541c`), Vercel Preview deployed successfully, then merged to `main` (`3d43c6e`) with the user's explicit approval and auto-deployed by Vercel — production status check came back `success`. Post-deploy smoke test against `splitzy-delta.vercel.app`: `/` and `/activity` both `307`→`/login` when signed out, matching the expected auth-gated behavior.
 
 ## 📬 Invitations inbox (branch `feature/invitations`)
 
@@ -234,7 +234,6 @@ Before the first push, ran a full security/git audit:
 
 ## 📋 Remaining
 
-- [ ] Human walkthrough of `feature/trip-expense-engine`'s Preview deployment, then merge to `main` with explicit approval (Stage 3 — see the entry at the top of this file)
 - [ ] Add the same 3 env vars to Vercel (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) and import `snehil2804/splitzy` as the Vercel project — see SETUP.md
 - [ ] Manual/visual walkthrough of the running app against live data (dashboard, expenses, balances, add-expense, delete) — recommended before considering the feature fully done, though not a deployment blocker
 - [ ] Visual pass on a real iPhone (safe areas, standalone PWA mode)

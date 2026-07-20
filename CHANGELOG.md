@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] — Stage 3: trip lifecycle, expense splits, balances & settlements (branch `feature/trip-expense-engine`)
+## [Stage 3] — trip lifecycle, expense splits, balances & settlements — merged & live (`main` @ `3d43c6e`)
 
 The financial engine: 4 expense split methods, creator-or-owner permissions, trip lifecycle management, optimized settlements, and an activity feed.
 
