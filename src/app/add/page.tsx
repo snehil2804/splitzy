@@ -11,14 +11,13 @@ import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/compon
 import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { useSession } from "@/hooks/useSession";
 import { useTripData } from "@/hooks/useTripData";
+import { PAYMENT_SUGGESTIONS } from "@/lib/constants";
 import { getExpensePermissions } from "@/lib/expensePermissions";
 import { addExpense, editExpense } from "@/lib/queries";
 import { validateSplit } from "@/lib/splitValidation";
 import type { LocationInput, SplitType } from "@/lib/types";
 
 type SplitMode = "everyone" | "custom";
-
-const PAYMENT_SUGGESTIONS = ["Cash", "GPay", "PhonePe", "Card"];
 
 /**
  * Manual Add/Edit Expense form. Calls `add_expense()`/`edit_expense()`,
