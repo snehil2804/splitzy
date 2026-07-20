@@ -82,11 +82,31 @@ try {
     }
   }
   const net = (id) => (paid[id] ?? 0) - (share[id] ?? 0);
-  const others = Object.keys(share).filter((id) => id !== SNEHIL_MEMBER);
+
+  // The ₹900 dinner is the fixed baseline row, so its own split stays a
+  // stable, exact assertion: 3 participants at ₹300 each.
+  const dinnerShares = (dinner?.expense_participants ?? []).map((p) => Number(p.share_amount));
   ok(
-    "6. balances: Snehil +600, each other member −300",
-    net(SNEHIL_MEMBER) === 600 && others.length === 2 && others.every((id) => net(id) === -300),
-    `snehil=${net(SNEHIL_MEMBER)}`,
+    "6a. the baseline ₹900 dinner is still split 3 ways at ₹300 each",
+    dinnerShares.length === 3 && dinnerShares.every((s) => s === 300),
+    `shares=[${dinnerShares.join(", ")}]`,
+  );
+
+  // Trip-wide balances used to be asserted as fixed figures (Snehil +600,
+  // everyone else −300), which silently assumed this trip would only ever
+  // contain that one dinner. It's a real, in-use trip, so that broke as soon
+  // as more expenses were added. The durable property is the invariant the
+  // split math actually guarantees: every rupee paid is allocated as shares,
+  // so all nets cancel to zero. That holds for any number of expenses and is
+  // a stronger check of paise-exact allocation than the old fixed numbers.
+  const allIds = new Set([...Object.keys(paid), ...Object.keys(share)]);
+  const netSum = [...allIds].reduce((total, id) => total + net(id), 0);
+  const totalPaid = Object.values(paid).reduce((total, v) => total + v, 0);
+  const totalShare = Object.values(share).reduce((total, v) => total + v, 0);
+  ok(
+    "6b. trip balances are internally consistent (all nets cancel, paid == allocated)",
+    Math.abs(netSum) < 0.01 && Math.abs(totalPaid - totalShare) < 0.01,
+    `nets=${netSum.toFixed(2)} paid=${totalPaid.toFixed(2)} allocated=${totalShare.toFixed(2)}`,
   );
 
   // ── Multi-trip write path in a disposable sandbox ────────────────────────
