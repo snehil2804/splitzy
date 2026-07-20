@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { isPlacesConfigured, resolveCurrentPlace, type PlaceResult } from "@/lib/places";
+import { checkPlacesConfigured, resolveCurrentPlace, type PlaceResult } from "@/lib/places";
 
 /**
  * Automatic GPS → named-place detection for the Add Expense screen.
@@ -9,7 +9,9 @@ import { isPlacesConfigured, resolveCurrentPlace, type PlaceResult } from "@/lib
  * browser's native permission prompt the first time (nothing extra needed
  * to "ask"); if permission was already granted or denied in a past visit,
  * the browser resolves/rejects immediately with no prompt at all — exactly
- * the "don't ask again" behavior this is meant to have.
+ * the "don't ask again" behavior this is meant to have. Skips requesting
+ * permission entirely if Smart Location isn't configured server-side,
+ * since there'd be nothing to resolve the coordinates to.
  */
 
 export type LocationDetectionStatus =
@@ -38,13 +40,8 @@ const MAX_AUTO_RETRIES = 1;
 
 interface DetectionResult {
   attempt: number;
-  status: Exclude<LocationDetectionStatus, "idle" | "locating" | "unsupported">;
+  status: Exclude<LocationDetectionStatus, "idle" | "locating">;
   place: PlaceResult | null;
-}
-
-/** Fully deterministic from the environment — never needs to be an effect/state. */
-function isUnsupported(): boolean {
-  return typeof navigator === "undefined" || !navigator.geolocation || !isPlacesConfigured;
 }
 
 export function useCurrentLocation(enabled: boolean): UseCurrentLocationResult {
@@ -52,44 +49,51 @@ export function useCurrentLocation(enabled: boolean): UseCurrentLocationResult {
   const [result, setResult] = useState<DetectionResult | null>(null);
 
   useEffect(() => {
-    if (!enabled || isUnsupported()) return;
-
+    if (!enabled) return;
     let cancelled = false;
-    let autoRetries = 0;
 
-    function attemptDetect() {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          if (cancelled) return;
-          try {
-            const resolved = await resolveCurrentPlace(
-              position.coords.latitude,
-              position.coords.longitude,
-            );
-            if (!cancelled) setResult({ attempt, status: "done", place: resolved });
-          } catch {
-            if (!cancelled) setResult({ attempt, status: "unavailable", place: null });
-          }
-        },
-        (error) => {
-          if (cancelled) return;
-          if (error.code === error.PERMISSION_DENIED) {
-            setResult({ attempt, status: "denied", place: null });
-            return;
-          }
-          if (autoRetries < MAX_AUTO_RETRIES) {
-            autoRetries += 1;
-            setTimeout(() => {
-              if (!cancelled) attemptDetect();
-            }, 1500);
-          } else {
-            setResult({ attempt, status: "unavailable", place: null });
-          }
-        },
-        GEO_OPTIONS,
-      );
-    }
-    attemptDetect();
+    checkPlacesConfigured().then((configured) => {
+      if (cancelled) return;
+      if (!configured || typeof navigator === "undefined" || !navigator.geolocation) {
+        setResult({ attempt, status: "unsupported", place: null });
+        return;
+      }
+
+      let autoRetries = 0;
+      function attemptDetect() {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            if (cancelled) return;
+            try {
+              const resolved = await resolveCurrentPlace(
+                position.coords.latitude,
+                position.coords.longitude,
+              );
+              if (!cancelled) setResult({ attempt, status: "done", place: resolved });
+            } catch {
+              if (!cancelled) setResult({ attempt, status: "unavailable", place: null });
+            }
+          },
+          (error) => {
+            if (cancelled) return;
+            if (error.code === error.PERMISSION_DENIED) {
+              setResult({ attempt, status: "denied", place: null });
+              return;
+            }
+            if (autoRetries < MAX_AUTO_RETRIES) {
+              autoRetries += 1;
+              setTimeout(() => {
+                if (!cancelled) attemptDetect();
+              }, 1500);
+            } else {
+              setResult({ attempt, status: "unavailable", place: null });
+            }
+          },
+          GEO_OPTIONS,
+        );
+      }
+      attemptDetect();
+    });
 
     return () => {
       cancelled = true;
@@ -99,11 +103,7 @@ export function useCurrentLocation(enabled: boolean): UseCurrentLocationResult {
   // No result recorded yet for the current attempt = still in flight —
   // derived, not a separately-tracked "loading" flag.
   const current = result?.attempt === attempt ? result : null;
-  const status: LocationDetectionStatus = !enabled
-    ? "idle"
-    : isUnsupported()
-      ? "unsupported"
-      : (current?.status ?? "locating");
+  const status: LocationDetectionStatus = !enabled ? "idle" : (current?.status ?? "locating");
   const place = current?.place ?? null;
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);

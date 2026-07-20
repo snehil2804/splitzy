@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   autocompletePlaces,
+  checkPlacesConfigured,
   getPlaceDetails,
-  isPlacesConfigured,
   nearbySearch,
   newSessionToken,
   type PlaceResult,
@@ -58,47 +58,60 @@ export function LocationPicker({
   const [recents] = useState<LocationInput[]>(() => getRecentLocations());
   const [resolvingPlaceId, setResolvingPlaceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // null = still checking (never shown as "not configured" during the
+  // brief same-origin round trip), true/false once known.
+  const [placesConfigured, setPlacesConfigured] = useState<boolean | null>(null);
   const sessionToken = useRef(newSessionToken());
+
+  useEffect(() => {
+    let cancelled = false;
+    checkPlacesConfigured().then((configured) => {
+      if (!cancelled) setPlacesConfigured(configured);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const coordsKey = coords ? `${coords.latitude},${coords.longitude}` : null;
   // No result recorded yet for the current coords/query = still in flight —
   // derived, not a separately-tracked "loading" flag. Never "loading" when
   // Places isn't configured at all, since no request is ever made.
   const loadingNearby =
-    isPlacesConfigured && coordsKey !== null && nearbyFetch?.key !== coordsKey;
+    placesConfigured === true && coordsKey !== null && nearbyFetch?.key !== coordsKey;
   const nearby = nearbyFetch?.key === coordsKey ? nearbyFetch.places : [];
 
   const trimmedQuery = query.trim();
   const loadingSearch =
-    isPlacesConfigured && trimmedQuery !== "" && searchFetch?.query !== trimmedQuery;
+    placesConfigured === true && trimmedQuery !== "" && searchFetch?.query !== trimmedQuery;
   const suggestions = searchFetch?.query === trimmedQuery ? searchFetch.suggestions : [];
 
   useEffect(() => {
-    if (!coords || !coordsKey || !isPlacesConfigured) return;
+    if (!coords || !coordsKey || placesConfigured !== true) return;
     let cancelled = false;
     nearbySearch(coords.latitude, coords.longitude, 500)
       .then((places) => {
         if (!cancelled) setNearbyFetch({ key: coordsKey, places });
       })
-      .catch(() => {
-        if (!cancelled) setError("Couldn't load nearby places.");
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Couldn't load nearby places.");
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by coordsKey, not the coords object identity
-  }, [coordsKey]);
+  }, [coordsKey, placesConfigured]);
 
   useEffect(() => {
-    if (!trimmedQuery || !isPlacesConfigured) return;
+    if (!trimmedQuery || placesConfigured !== true) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       autocompletePlaces(trimmedQuery, sessionToken.current, coords ?? undefined)
         .then((results) => {
           if (!cancelled) setSearchFetch({ query: trimmedQuery, suggestions: results });
         })
-        .catch(() => {
-          if (!cancelled) setError("Search isn't working right now.");
+        .catch((err) => {
+          if (!cancelled) setError(err instanceof Error ? err.message : "Search isn't working right now.");
         });
     }, 300);
     return () => {
@@ -106,7 +119,7 @@ export function LocationPicker({
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- coords only used to bias search, coordsKey is the real dep
-  }, [trimmedQuery, coordsKey]);
+  }, [trimmedQuery, coordsKey, placesConfigured]);
 
   function choose(location: LocationInput) {
     addRecentLocation(location);
@@ -120,8 +133,8 @@ export function LocationPicker({
       const place = await getPlaceDetails(s.placeId, sessionToken.current);
       choose(toLocationInput(place));
       sessionToken.current = newSessionToken();
-    } catch {
-      setError("Couldn't get details for that place.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't get details for that place.");
     } finally {
       setResolvingPlaceId(null);
     }
@@ -175,7 +188,7 @@ export function LocationPicker({
         </div>
 
         <div className="mt-2 flex-1 overflow-y-auto px-5 pb-6">
-          {!isPlacesConfigured && (
+          {placesConfigured === false && (
             <p className="mt-4 rounded-2xl bg-line/60 p-4 text-center text-sm text-ink-muted">
               Location search isn&apos;t set up yet — type a name below and it&apos;ll be saved as-is.
             </p>
