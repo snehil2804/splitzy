@@ -3,15 +3,17 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
-import { CheckIcon, MapPinIcon } from "@/components/icons";
+import { CheckIcon, CrosshairIcon, MapPinIcon } from "@/components/icons";
+import { LocationPicker } from "@/components/LocationPicker";
 import { CardSkeleton } from "@/components/Skeleton";
 import { SplitFields } from "@/components/SplitFields";
 import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
+import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { useSession } from "@/hooks/useSession";
 import { useTripData } from "@/hooks/useTripData";
 import { addExpense, editExpense } from "@/lib/queries";
 import { validateSplit } from "@/lib/splitValidation";
-import type { SplitType } from "@/lib/types";
+import type { LocationInput, SplitType } from "@/lib/types";
 
 type SplitMode = "everyone" | "custom";
 
@@ -62,7 +64,11 @@ function AddExpenseFlow() {
   const [splitType, setSplitType] = useState<SplitType>("equal");
   const [splitValues, setSplitValues] = useState<Record<string, string>>({});
   const [paymentApp, setPaymentApp] = useState("");
-  const [locationName, setLocationName] = useState("");
+  // Only ever set by the user (manual pick) or by edit-mode hydration.
+  // Auto-detection is never copied in here — it's applied as a fallback
+  // below, purely at render/derivation time.
+  const [manualLocation, setManualLocation] = useState<LocationInput | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [category, setCategory] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -72,6 +78,40 @@ function AddExpenseFlow() {
 
   // Default payer = the signed-in user's member, unless overridden by a tap.
   const paidById = paidByOverride ?? data?.myMemberId ?? null;
+
+  // Smart Location: request/read GPS in the background and resolve it to a
+  // named place, entirely automatic — only while genuinely showing the Add
+  // form for an active trip (never mid-edit, where we shouldn't silently
+  // override the expense's original location with wherever the device is
+  // right now).
+  const autoDetectEnabled =
+    !isEditing && !!data?.trip && data.trip.status === "active" && !succeeded;
+  const { status: geoStatus, place: autoDetectedPlace } = useCurrentLocation(autoDetectEnabled);
+
+  // The auto-detected place is only ever used as a fallback for display/
+  // submission — never copied into state — so a manual pick always wins
+  // immediately with no risk of a slower GPS result clobbering it later.
+  const location: LocationInput | null =
+    manualLocation ??
+    (!isEditing && autoDetectedPlace
+      ? {
+          name: autoDetectedPlace.name,
+          formattedAddress: autoDetectedPlace.formattedAddress,
+          latitude: autoDetectedPlace.latitude,
+          longitude: autoDetectedPlace.longitude,
+          placeId: autoDetectedPlace.placeId,
+        }
+      : null);
+  const locationSource: "auto" | "manual" | null = manualLocation
+    ? "manual"
+    : location
+      ? "auto"
+      : null;
+
+  function handleLocationPicked(picked: LocationInput) {
+    setManualLocation(picked);
+    setPickerOpen(false);
+  }
 
   // Hydrate the form once per expense when opened in edit mode — guarded so
   // background refreshes (e.g. after another tab edits a different expense)
@@ -88,7 +128,17 @@ function AddExpenseFlow() {
     setCategory(editingExpense.category ?? "");
     setNotes(editingExpense.notes ?? "");
     setPaymentApp(editingExpense.paymentApp ?? "");
-    setLocationName(editingExpense.locationName ?? "");
+    setManualLocation(
+      editingExpense.locationName
+        ? {
+            name: editingExpense.locationName,
+            formattedAddress: editingExpense.locationFormattedAddress,
+            latitude: editingExpense.latitude,
+            longitude: editingExpense.longitude,
+            placeId: editingExpense.locationPlaceId,
+          }
+        : null,
+    );
     setSplitType(editingExpense.splitType);
 
     const allMemberIds = data.members.map((m) => m.id).sort();
@@ -185,7 +235,7 @@ function AddExpenseFlow() {
           participantIds,
           paidAt: null,
           paymentApp: paymentApp.trim() || null,
-          locationName: locationName.trim() || null,
+          location,
           splitType,
           splits,
           category: category.trim() || null,
@@ -200,7 +250,7 @@ function AddExpenseFlow() {
           participantIds,
           paymentApp: paymentApp.trim() || null,
           paidAt: new Date(),
-          locationName: locationName.trim() || null,
+          location,
           splitType,
           splits,
           category: category.trim() || null,
@@ -548,21 +598,38 @@ function AddExpenseFlow() {
           </div>
 
           <div>
-            <label htmlFor="location" className="text-sm font-semibold">
+            <span className="text-sm font-semibold">
               Location <span className="text-ink-faint">(optional)</span>
-            </label>
-            <div className="relative mt-2">
-              <MapPinIcon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
-              <input
-                id="location"
-                type="text"
-                value={locationName}
-                onChange={(e) => setLocationName(e.target.value)}
-                placeholder="Where was this?"
-                maxLength={80}
-                className="w-full rounded-2xl border-2 border-transparent bg-line/60 py-3 pl-10 pr-4 text-sm outline-none transition-colors focus:border-brand"
-              />
-            </div>
+            </span>
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="tap mt-2 flex w-full items-center gap-3 rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-left text-sm outline-none transition-colors focus:border-brand"
+            >
+              {locationSource === "auto" ? (
+                <CrosshairIcon className="size-4 shrink-0 text-brand" />
+              ) : (
+                <MapPinIcon className="size-4 shrink-0 text-ink-faint" />
+              )}
+              <span className="min-w-0 flex-1">
+                {location ? (
+                  <span className="flex items-center gap-2">
+                    <span className="truncate">{location.name}</span>
+                    {locationSource && (
+                      <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+                        {locationSource === "auto" ? "Auto-detected" : "Selected"}
+                      </span>
+                    )}
+                  </span>
+                ) : geoStatus === "locating" ? (
+                  <span className="text-ink-faint">Finding your location…</span>
+                ) : geoStatus === "denied" ? (
+                  <span className="text-ink-faint">Location access denied — tap to search</span>
+                ) : (
+                  <span className="text-ink-faint">Where was this?</span>
+                )}
+              </span>
+            </button>
           </div>
         </section>
 
@@ -586,6 +653,19 @@ function AddExpenseFlow() {
               : "Add expense"}
         </button>
       </form>
+
+      {pickerOpen && (
+        <LocationPicker
+          onClose={() => setPickerOpen(false)}
+          onSelect={handleLocationPicked}
+          autoDetectedPlace={autoDetectedPlace}
+          coords={
+            autoDetectedPlace
+              ? { latitude: autoDetectedPlace.latitude, longitude: autoDetectedPlace.longitude }
+              : null
+          }
+        />
+      )}
     </div>
   );
 }

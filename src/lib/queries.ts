@@ -58,6 +58,10 @@ function mapExpense(row: ExpenseRow): Expense {
     shares,
     participantIds,
     locationName: row.location_name,
+    locationFormattedAddress: row.location_formatted_address,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    locationPlaceId: row.location_place_id,
     date: new Date(row.paid_at ?? row.created_at),
     createdBy: row.created_by,
     splitType: row.split_type,
@@ -212,11 +216,15 @@ export async function addExpense(input: AddExpenseInput): Promise<string> {
     p_participant_ids: input.participantIds,
     p_payment_app: input.paymentApp,
     p_paid_at: input.paidAt.toISOString(),
-    p_location_name: input.locationName,
+    p_location_name: input.location?.name ?? null,
     p_split_type: input.splitType,
     p_splits: input.splits?.map((s) => ({ member_id: s.memberId, value: s.value })) ?? null,
     p_category: input.category,
     p_notes: input.notes,
+    p_latitude: input.location?.latitude ?? null,
+    p_longitude: input.location?.longitude ?? null,
+    p_location_place_id: input.location?.placeId ?? null,
+    p_location_formatted_address: input.location?.formattedAddress ?? null,
   });
   if (error) throw new Error(error.message);
   return data as string;
@@ -237,11 +245,15 @@ export async function editExpense(input: EditExpenseInput): Promise<void> {
     p_participant_ids: input.participantIds,
     p_paid_at: input.paidAt?.toISOString() ?? null,
     p_payment_app: input.paymentApp,
-    p_location_name: input.locationName,
+    p_location_name: input.location?.name ?? null,
     p_split_type: input.splitType,
     p_splits: input.splits?.map((s) => ({ member_id: s.memberId, value: s.value })) ?? null,
     p_category: input.category,
     p_notes: input.notes,
+    p_latitude: input.location?.latitude ?? null,
+    p_longitude: input.location?.longitude ?? null,
+    p_location_place_id: input.location?.placeId ?? null,
+    p_location_formatted_address: input.location?.formattedAddress ?? null,
   });
   if (error) throw new Error(error.message);
 }

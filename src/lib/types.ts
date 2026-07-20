@@ -81,6 +81,8 @@ export interface ExpenseRow {
   latitude: number | null;
   longitude: number | null;
   location_name: string | null;
+  location_place_id: string | null;
+  location_formatted_address: string | null;
   participant_count: number | null;
   share_per_person: number | null;
   created_at: string;
@@ -179,7 +181,14 @@ export interface Expense {
   /** member id → their share of this expense */
   shares: Record<string, number>;
   participantIds: string[];
+  /** Concise, human-friendly place name — what the UI shows (e.g. "Blue Tokai Coffee"). */
   locationName: string | null;
+  /** Full address, stored for reference/future features — never shown as the primary label. */
+  locationFormattedAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  /** Google Places place_id, when picked from search/nearby/current-location. Null for manually typed locations. */
+  locationPlaceId: string | null;
   /** When the payment happened (`paid_at`), not when the row was created. */
   date: Date;
   /** Auth user id of whoever logged it; null for pre-Stage-3 rows. */
@@ -249,6 +258,22 @@ export interface ExpenseSplitInput {
 }
 
 /**
+ * A resolved location — from GPS auto-detection, the location picker
+ * (current location / nearby / search), or typed manually (in which case
+ * everything but `name` is null). One shape covers all three sources so
+ * the Add/Edit Expense form only ever deals with one type.
+ */
+export interface LocationInput {
+  /** Concise, human-friendly place name — what gets shown throughout the UI. */
+  name: string;
+  formattedAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  /** Google Places place_id. Null for manually typed locations. */
+  placeId: string | null;
+}
+
+/**
  * Input for `addExpense()`. Maps to the `add_expense()` RPC (ID-based, any
  * trip size); the split itself is computed by that Postgres function, never
  * in the client.
@@ -261,7 +286,7 @@ export interface AddExpenseInput {
   participantIds: string[];
   paymentApp: string | null;
   paidAt: Date;
-  locationName: string | null;
+  location: LocationInput | null;
   splitType: SplitType;
   /** Required for exact/percentage/shares; ignored for equal. */
   splits: ExpenseSplitInput[] | null;
@@ -278,7 +303,7 @@ export interface EditExpenseInput {
   participantIds: string[];
   paidAt: Date | null;
   paymentApp: string | null;
-  locationName: string | null;
+  location: LocationInput | null;
   splitType: SplitType;
   splits: ExpenseSplitInput[] | null;
   category: string | null;

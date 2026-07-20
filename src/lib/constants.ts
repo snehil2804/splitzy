@@ -24,6 +24,7 @@ export function memberStyle(name: string) {
 export const STORAGE_KEYS = {
   theme: "splitzy:theme",
   tripId: "splitzy:tripId",
+  recentLocations: "splitzy:recentLocations",
 } as const;
 
 export type ThemePreference = "system" | "light" | "dark";
