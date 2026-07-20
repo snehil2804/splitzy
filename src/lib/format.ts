@@ -51,6 +51,20 @@ export function formatDate(date: Date): string {
   return dayFormat.format(date);
 }
 
+const fullDateTimeFormat = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+/** "20 July 2026, 8:42 PM" — full, unambiguous date + time for detail views. */
+export function formatFullDateTime(date: Date): string {
+  return fullDateTimeFormat.format(date);
+}
+
 /** Stable key for grouping expenses by calendar day. */
 export function dayKey(date: Date): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;

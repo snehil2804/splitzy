@@ -9,8 +9,10 @@ interface ExpenseCardProps {
   expense: Expense;
   membersById: Map<string, Member>;
   onDelete?: (expense: Expense) => void;
-  /** Only rendered when the signed-in member may edit this expense (creator or trip owner). */
+  /** Only rendered when the signed-in member may edit this expense (creator only). */
   onEdit?: (expense: Expense) => void;
+  /** Opens the full expense detail preview. When provided, the whole card becomes clickable. */
+  onView?: (expense: Expense) => void;
   /** Compact rows for the dashboard's recent list. */
   compact?: boolean;
   /** Stagger index for the entrance animation. */
@@ -22,6 +24,7 @@ export function ExpenseCard({
   membersById,
   onDelete,
   onEdit,
+  onView,
   compact = false,
   index = 0,
 }: ExpenseCardProps) {
@@ -32,7 +35,21 @@ export function ExpenseCard({
 
   return (
     <article
-      className="anim-fade-up glass flex items-center gap-3.5 rounded-3xl p-4"
+      onClick={onView ? () => onView(expense) : undefined}
+      onKeyDown={
+        onView
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onView(expense);
+              }
+            }
+          : undefined
+      }
+      role={onView ? "button" : undefined}
+      tabIndex={onView ? 0 : undefined}
+      aria-label={onView ? `View details for ${expense.description}` : undefined}
+      className={`anim-fade-up glass flex items-center gap-3.5 rounded-3xl p-4 ${onView ? "tap cursor-pointer" : ""}`}
       style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
     >
       <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-brand-soft text-xl">
@@ -70,7 +87,10 @@ export function ExpenseCard({
           <div className="flex items-center gap-1">
             {onEdit && (
               <button
-                onClick={() => onEdit(expense)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(expense);
+                }}
                 aria-label={`Edit ${expense.description}`}
                 className="tap -m-1 rounded-full p-1.5 text-ink-faint transition-colors hover:text-brand"
               >
@@ -79,7 +99,10 @@ export function ExpenseCard({
             )}
             {onDelete && (
               <button
-                onClick={() => onDelete(expense)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(expense);
+                }}
                 aria-label={`Delete ${expense.description}`}
                 className="tap -m-1 rounded-full p-1.5 text-ink-faint transition-colors hover:text-negative"
               >

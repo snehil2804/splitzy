@@ -1,19 +1,43 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { ExpenseCard } from "@/components/ExpenseCard";
+import { ExpenseDetailSheet } from "@/components/ExpenseDetailSheet";
 import { ListSkeleton } from "@/components/Skeleton";
 import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
 import { useSession } from "@/hooks/useSession";
 import { useTripData } from "@/hooks/useTripData";
 import { totalSpent } from "@/lib/balances";
+import { getExpensePermissions } from "@/lib/expensePermissions";
 import { dayKey, formatDayLabel, formatINR } from "@/lib/format";
 import type { Expense } from "@/lib/types";
 
 export default function ExpensesPage() {
+  return (
+    <Suspense fallback={<ExpensesShell><ListSkeleton count={6} /></ExpensesShell>}>
+      <ExpensesFlow />
+    </Suspense>
+  );
+}
+
+function ExpensesShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="space-y-6">
+      <header className="anim-fade-up pt-2">
+        <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
+      </header>
+      {children}
+    </div>
+  );
+}
+
+function ExpensesFlow() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const viewingExpenseId = searchParams.get("view");
+
   const { status, data, error, refresh, deleteExpense } = useTripData();
   const { session } = useSession();
   const [pendingDelete, setPendingDelete] = useState<Expense | null>(null);
@@ -26,8 +50,17 @@ export default function ExpensesPage() {
   );
 
   const myUserId = session?.user.id ?? null;
-  const canEdit = (expense: Expense) =>
-    data?.myRole === "owner" || (myUserId !== null && expense.createdBy === myUserId);
+  const myRole = data?.myRole ?? null;
+
+  const viewingExpense = data?.expenses.find((e) => e.id === viewingExpenseId) ?? null;
+
+  function openDetail(expense: Expense) {
+    router.push(`/expenses?view=${expense.id}`);
+  }
+
+  function closeDetail() {
+    router.replace("/expenses");
+  }
 
   /** Expenses grouped by calendar day, newest day first. */
   const days = useMemo(() => {
@@ -53,7 +86,11 @@ export default function ExpensesPage() {
     setDeleteError(null);
     try {
       await deleteExpense(pendingDelete.id, myMemberId);
+      const deletedId = pendingDelete.id;
       setPendingDelete(null);
+      if (viewingExpenseId === deletedId) {
+        router.replace("/expenses");
+      }
     } catch (err) {
       setDeleteError(
         err instanceof Error ? err.message : "Couldn't delete that expense",
@@ -96,20 +133,24 @@ export default function ExpensesPage() {
               {day.label}
             </h2>
             <div className="space-y-3">
-              {day.expenses.map((expense, i) => (
-                <ExpenseCard
-                  key={expense.id}
-                  expense={expense}
-                  membersById={membersById}
-                  onDelete={setPendingDelete}
-                  onEdit={
-                    canEdit(expense)
-                      ? (e) => router.push(`/add?edit=${e.id}`)
-                      : undefined
-                  }
-                  index={i}
-                />
-              ))}
+              {day.expenses.map((expense, i) => {
+                const permissions = getExpensePermissions(expense, myUserId, myRole);
+                return (
+                  <ExpenseCard
+                    key={expense.id}
+                    expense={expense}
+                    membersById={membersById}
+                    onView={openDetail}
+                    onDelete={permissions.canDelete ? setPendingDelete : undefined}
+                    onEdit={
+                      permissions.canEdit
+                        ? (e) => router.push(`/add?edit=${e.id}`)
+                        : undefined
+                    }
+                    index={i}
+                  />
+                );
+              })}
             </div>
           </section>
         ))}
@@ -120,6 +161,23 @@ export default function ExpensesPage() {
         </p>
       )}
 
+      {viewingExpense && data && (
+        <ExpenseDetailSheet
+          expense={viewingExpense}
+          members={data.members}
+          membersById={membersById}
+          tripName={data.trip?.name ?? null}
+          myUserId={myUserId}
+          myRole={myRole}
+          onClose={closeDetail}
+          onEdit={(e) => router.push(`/add?edit=${e.id}`)}
+          onDeleteRequest={setPendingDelete}
+        />
+      )}
+
+      {/* Rendered after the detail sheet so it stacks above it (both are
+          fixed z-50 overlays — later in the DOM wins) when delete is
+          triggered from within the preview. */}
       <ConfirmSheet
         open={pendingDelete !== null}
         title="Delete this expense?"

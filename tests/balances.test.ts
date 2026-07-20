@@ -26,6 +26,8 @@ function expense(overrides: Partial<Expense>): Expense {
     locationPlaceId: null,
     date: new Date("2026-07-19"),
     createdBy: null,
+    recordCreatedAt: new Date("2026-07-19"),
+    recordUpdatedAt: null,
     splitType: "equal",
     category: null,
     notes: null,

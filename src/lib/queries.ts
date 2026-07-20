@@ -64,6 +64,8 @@ function mapExpense(row: ExpenseRow): Expense {
     locationPlaceId: row.location_place_id,
     date: new Date(row.paid_at ?? row.created_at),
     createdBy: row.created_by,
+    recordCreatedAt: new Date(row.created_at),
+    recordUpdatedAt: row.updated_at ? new Date(row.updated_at) : null,
     splitType: row.split_type,
     category: row.category,
     notes: row.notes,

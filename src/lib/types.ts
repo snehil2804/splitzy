@@ -193,6 +193,10 @@ export interface Expense {
   date: Date;
   /** Auth user id of whoever logged it; null for pre-Stage-3 rows. */
   createdBy: string | null;
+  /** When this row was first inserted — distinct from `date` (`paid_at`). */
+  recordCreatedAt: Date;
+  /** When this row was last edited, if ever. */
+  recordUpdatedAt: Date | null;
   splitType: SplitType;
   category: string | null;
   notes: string | null;

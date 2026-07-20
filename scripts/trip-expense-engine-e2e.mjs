@@ -343,6 +343,10 @@ try {
   });
   ok("a member can edit their own expense", !memberEditsOwnErr, memberEditsOwnErr?.message ?? "");
 
+  // Expense Details feature: edit is creator-ONLY now — the trip owner no
+  // longer has an edit override (they still have a delete-only override,
+  // tested below). This is a deliberate tightening from the original
+  // Stage 3 "creator or owner" edit rule.
   const { error: ownerEditsMemberExpenseErr } = await owner.rpc("edit_expense", {
     p_expense_id: memberExpenseId,
     p_description: "Owner override edit",
@@ -350,7 +354,43 @@ try {
     p_paid_by: memberMemberId,
     p_participant_ids: [memberMemberId],
   });
-  ok("the trip owner can edit any member's expense", !ownerEditsMemberExpenseErr, ownerEditsMemberExpenseErr?.message ?? "");
+  ok(
+    "the trip owner can no longer edit a member's expense (creator-only edit rule)",
+    Boolean(ownerEditsMemberExpenseErr) &&
+      /only the person who logged this expense can edit it/i.test(ownerEditsMemberExpenseErr?.message ?? ""),
+    ownerEditsMemberExpenseErr?.message ?? "",
+  );
+
+  // Legacy expense simulation: created_by = null (rows that predate
+  // creator tracking) — no one may edit them, but the trip owner may still
+  // delete them (there being no creator to defer to).
+  const { data: legacyExpenseId, error: legacyAddErr } = await owner.rpc("add_expense", {
+    p_trip_id: tripId,
+    p_paid_by: ownerMemberId,
+    p_amount: 50,
+    p_description: "Simulated legacy expense",
+    p_participant_ids: [ownerMemberId],
+    p_split_type: "equal",
+  });
+  if (legacyAddErr) throw legacyAddErr;
+  const { error: legacyNullifyErr } = await admin
+    .from("expenses")
+    .update({ created_by: null })
+    .eq("id", legacyExpenseId);
+  if (legacyNullifyErr) throw legacyNullifyErr;
+
+  const { error: ownerEditsLegacyErr } = await owner.rpc("edit_expense", {
+    p_expense_id: legacyExpenseId,
+    p_description: "Trying to edit a legacy expense",
+    p_amount: 60,
+    p_paid_by: ownerMemberId,
+    p_participant_ids: [ownerMemberId],
+  });
+  ok(
+    "not even the trip owner can edit a legacy (creator-less) expense",
+    Boolean(ownerEditsLegacyErr),
+    ownerEditsLegacyErr?.message ?? "",
+  );
 
   // ── 6. soft-delete permissions (RLS: creator or owner only) ────────────
   const { error: memberDeletesOwnerExpenseErr, data: memberDeleteResult } = await member
@@ -373,6 +413,17 @@ try {
     "a member can delete their own expense",
     !memberDeletesOwnErr && (memberDeleteOwnResult ?? []).length === 1,
     memberDeletesOwnErr?.message ?? "",
+  );
+
+  const { error: ownerDeletesLegacyErr, data: ownerDeletesLegacyResult } = await owner
+    .from("expenses")
+    .update({ deleted_at: new Date().toISOString(), deletion_reason: "e2e" })
+    .eq("id", legacyExpenseId)
+    .select();
+  ok(
+    "the trip owner CAN delete a legacy (creator-less) expense, even though they can't edit it",
+    !ownerDeletesLegacyErr && (ownerDeletesLegacyResult ?? []).length === 1,
+    ownerDeletesLegacyErr?.message ?? "",
   );
 
   // ── 7. settlements ───────────────────────────────────────────────────

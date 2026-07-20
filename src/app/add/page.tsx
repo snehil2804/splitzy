@@ -11,6 +11,7 @@ import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/compon
 import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { useSession } from "@/hooks/useSession";
 import { useTripData } from "@/hooks/useTripData";
+import { getExpensePermissions } from "@/lib/expensePermissions";
 import { addExpense, editExpense } from "@/lib/queries";
 import { validateSplit } from "@/lib/splitValidation";
 import type { LocationInput, SplitType } from "@/lib/types";
@@ -53,8 +54,7 @@ function AddExpenseFlow() {
   const canEditThis =
     !isEditing ||
     !editingExpense ||
-    data?.myRole === "owner" ||
-    (session?.user.id != null && editingExpense.createdBy === session.user.id);
+    getExpensePermissions(editingExpense, session?.user.id ?? null, data?.myRole ?? null).canEdit;
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -165,9 +165,13 @@ function AddExpenseFlow() {
 
   useEffect(() => {
     if (!succeeded) return;
-    const timer = setTimeout(() => router.push("/expenses"), 900);
+    // After an edit, return to that expense's preview rather than the
+    // plain list, so the user sees their change reflected immediately.
+    const destination =
+      isEditing && editingExpense ? `/expenses?view=${editingExpense.id}` : "/expenses";
+    const timer = setTimeout(() => router.push(destination), 900);
     return () => clearTimeout(timer);
-  }, [succeeded, router]);
+  }, [succeeded, router, isEditing, editingExpense]);
 
   function toggleMember(id: string) {
     setSelectedIds((prev) => {
