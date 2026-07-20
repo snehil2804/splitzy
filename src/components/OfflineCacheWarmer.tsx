@@ -44,11 +44,19 @@ export function OfflineCacheWarmer() {
       console.error("Failed to cache offline reference data:", err);
     });
 
-    // Best-effort cache warm — lets the service worker capture the offline
-    // shell's HTML + JS chunks now, before they're ever needed offline.
+    // Ask the service worker to (re)precache the offline shell now that
+    // we're demonstrably online and authenticated. This must go through the
+    // worker rather than a plain `fetch()` here: fetching the routes from
+    // the page only ever caches those two HTML documents, not the JS chunks
+    // they need to actually render — without which Offline Mode loads and
+    // then sits on "Loading…" forever. `precacheShell()` in the worker
+    // scrapes and stores those chunks too.
     if ("serviceWorker" in navigator) {
-      fetch("/offline").catch(() => {});
-      fetch("/offline/add").catch(() => {});
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          registration.active?.postMessage({ type: "precache-shell" });
+        })
+        .catch(() => {});
     }
 
     // Reference data just refreshed, which means we're genuinely online —

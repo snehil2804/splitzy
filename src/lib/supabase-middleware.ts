@@ -8,8 +8,19 @@ import { NextResponse, type NextRequest } from "next/server";
  * the wrong response shape for a programmatic caller. `/join/<token>` must
  * also stay reachable signed-out — it shows the invite preview and the
  * sign-in CTA itself.
+ *
+ * `/offline` is public because it must be *precacheable* by the service
+ * worker, and a redirect response cannot be cached at all (`cache.put()`
+ * throws on one) — gating it meant the offline shell silently failed to
+ * cache whenever the service worker installed before sign-in. Nothing is
+ * lost by opening it: these pages render no server data whatsoever, read
+ * only this device's IndexedDB (already scoped per authenticated user id),
+ * and gate their own contents on identity — a signed-out visitor just sees
+ * "Open Splitzy once while connected". When the device is genuinely
+ * offline this proxy never runs anyway, so gating it was never the thing
+ * protecting anything.
  */
-const PUBLIC_PATHS = ["/login", "/auth", "/api", "/join"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api", "/join", "/offline"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

@@ -35,6 +35,20 @@ export function useOfflineIdentity(): OfflineIdentityResult {
 
   useEffect(() => {
     if (sessionStatus !== "loading") return;
+    // If the device already reports itself offline there is nothing to wait
+    // for — `getSession()`'s token refresh cannot possibly succeed — so skip
+    // straight to the cached identity instead of sitting on "Loading…" for
+    // the full timeout.
+    const alreadyOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+    if (alreadyOffline) {
+      let cancelled = false;
+      getMostRecentCachedUserId().then((id) => {
+        if (!cancelled) setFallbackUserId(id);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     const timer = setTimeout(() => {
       getMostRecentCachedUserId().then(setFallbackUserId);
     }, FALLBACK_TIMEOUT_MS);
