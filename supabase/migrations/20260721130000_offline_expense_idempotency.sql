@@ -1,29 +1,47 @@
 -- Offline expense queue: idempotency for the sync endpoint.
 --
--- Additive only. No existing column, index, grant, or RPC behavior for
--- online callers changes — `p_offline_idempotency_key` is a new trailing
--- parameter with a default of NULL, so every existing call site (the web
--- app's `addExpense()`, the live e2e suites) is unaffected.
+-- Additive only from a data-model standpoint: `offline_idempotency_key` is
+-- a new nullable column, and the partial unique index only ever constrains
+-- rows created through the offline sync path (key is null for every normal
+-- online expense) — no existing row or online call site's *behavior*
+-- changes.
 --
--- `add_expense()`'s signature is unchanged for its first 15 parameters, so
--- this uses `create or replace function` rather than `drop function` —
--- Postgres allows appending a new parameter with a default via `create or
--- replace`, which preserves the function's existing grants exactly (no
--- re-grant needed, confirmed against the live function definition before
--- writing this).
+-- IMPORTANT — corrected after applying to the live project: appending a new
+-- parameter to `add_expense()`, even with a default, changes its argument
+-- signature. `CREATE OR REPLACE FUNCTION` does *not* replace an existing
+-- function across a signature change — Postgres treats it as a distinct
+-- function and creates a second overload instead (confirmed live: this
+-- produced two coexisting `add_expense` functions). A brand-new function
+-- object also does not inherit the old one's grants — it gets Postgres's
+-- schema default, which on this project turned out to include `anon`
+-- (evidently via a default-privilege rule that predates the Stage 2 RLS
+-- hardening pass, which only revoked grants on *existing* objects, not
+-- future ones). Neither issue was a live exploit — `add_expense()` still
+-- checks `auth.uid()` internally and rejects unauthenticated callers
+-- regardless of the outer grant — but both are wrong and are fixed here:
+-- the old 16-parameter overload is dropped so only one `add_expense`
+-- exists, and its grants are set back explicitly to match the original
+-- function exactly (authenticated + service_role + postgres, nothing
+-- else). This file reflects the corrected, reproducible sequence — not the
+-- first (wrong) attempt.
 
 alter table public.expenses
   add column if not exists offline_idempotency_key uuid;
 
 -- Partial unique index: only constrains rows that actually came through
--- the offline sync path (key is null for every normal online expense),
--- scoped per-creator so two different users can never collide even in the
--- astronomically unlikely event of a client-side UUID collision.
+-- the offline sync path, scoped per-creator so two different users can
+-- never collide even in the astronomically unlikely event of a client-side
+-- UUID collision.
 create unique index if not exists expenses_offline_idempotency_key_idx
   on public.expenses (created_by, offline_idempotency_key)
   where offline_idempotency_key is not null;
 
-create or replace function public.add_expense(
+drop function if exists public.add_expense(
+  uuid, uuid, numeric, text, uuid[], text, timestamp with time zone,
+  text, text, jsonb, text, text, numeric, numeric, text, text
+);
+
+create function public.add_expense(
   p_trip_id uuid,
   p_paid_by uuid,
   p_amount numeric,
@@ -146,3 +164,15 @@ begin
   return v_expense_id;
 end;
 $function$;
+
+-- A brand-new function object always gets the schema's default grants —
+-- explicitly set them back to exactly what the original function had.
+revoke all on function public.add_expense(
+  uuid, uuid, numeric, text, uuid[], text, timestamp with time zone,
+  text, text, jsonb, text, text, numeric, numeric, text, text, uuid
+) from public, anon;
+
+grant execute on function public.add_expense(
+  uuid, uuid, numeric, text, uuid[], text, timestamp with time zone,
+  text, text, jsonb, text, text, numeric, numeric, text, text, uuid
+) to authenticated, service_role, postgres;
