@@ -49,7 +49,7 @@ export function ExpenseCard({
       role={onView ? "button" : undefined}
       tabIndex={onView ? 0 : undefined}
       aria-label={onView ? `View details for ${expense.description}` : undefined}
-      className={`anim-fade-up glass flex items-center gap-3.5 rounded-3xl p-4 ${onView ? "tap cursor-pointer" : ""}`}
+      className={`anim-fade-up glass flex items-center gap-3.5 rounded-3xl p-4 ${onView ? "tap glass-interactive cursor-pointer" : ""}`}
       style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
     >
       <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-brand-soft text-xl">

@@ -415,7 +415,7 @@ export default function TripsPage() {
               type="submit"
               disabled={creating || !newTripName.trim()}
               aria-label="Create trip"
-              className="tap grid size-12 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+              className="tap grid size-12 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
             >
               <PlusIcon className="size-5" strokeWidth={2.4} />
             </button>
@@ -462,7 +462,7 @@ export default function TripsPage() {
                     className={`tap flex min-h-12 w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-colors ${
                       selected
                         ? "border-brand bg-brand-soft"
-                        : "border-transparent bg-line/60"
+                        : "border-transparent bg-line/60 hover:bg-line"
                     }`}
                   >
                     <span className="text-xl">🧳</span>
@@ -497,7 +497,7 @@ export default function TripsPage() {
             type="submit"
             disabled={creating || !newTripName.trim()}
             aria-label="Create trip"
-            className="tap grid size-12 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+            className="tap grid size-12 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
           >
             <PlusIcon className="size-5" strokeWidth={2.4} />
           </button>
@@ -542,7 +542,7 @@ export default function TripsPage() {
                             )
                           }
                           disabled={busy}
-                          className="tap rounded-full px-2.5 py-1.5 text-xs font-semibold text-brand disabled:opacity-60"
+                          className="tap rounded-full px-2.5 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand-soft disabled:opacity-60"
                         >
                           {m.role === "owner" ? "Make member" : "Make owner"}
                         </button>
@@ -550,7 +550,7 @@ export default function TripsPage() {
                       <button
                         onClick={() => setPendingRemove(m)}
                         disabled={busy}
-                        className="tap rounded-full px-2.5 py-1.5 text-xs font-semibold text-negative disabled:opacity-60"
+                        className="tap rounded-full px-2.5 py-1.5 text-xs font-semibold text-negative transition-colors hover:bg-negative/10 disabled:opacity-60"
                       >
                         Remove
                       </button>
@@ -574,7 +574,7 @@ export default function TripsPage() {
                   type="submit"
                   disabled={busy || !guestName.trim()}
                   aria-label="Add guest member"
-                  className="tap grid size-12 shrink-0 place-items-center rounded-2xl bg-line text-ink disabled:opacity-60"
+                  className="tap grid size-12 shrink-0 place-items-center rounded-2xl bg-line text-ink transition-[filter] hover:brightness-95 disabled:opacity-60"
                 >
                   <PlusIcon className="size-5" strokeWidth={2.4} />
                 </button>
@@ -603,7 +603,7 @@ export default function TripsPage() {
                   <button
                     type="submit"
                     disabled={renaming || !renameValue.trim() || renameValue.trim() === data.trip.name}
-                    className="tap shrink-0 rounded-2xl bg-brand px-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+                    className="tap shrink-0 rounded-2xl bg-brand px-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
                   >
                     Save
                   </button>
@@ -629,7 +629,7 @@ export default function TripsPage() {
                       savingDescription ||
                       descriptionValue.trim() === (data.trip.description ?? "")
                     }
-                    className="tap shrink-0 rounded-2xl bg-brand px-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+                    className="tap shrink-0 rounded-2xl bg-brand px-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
                   >
                     Save
                   </button>
@@ -652,10 +652,10 @@ export default function TripsPage() {
                       : handleArchiveToggle()
                   }
                   disabled={busy}
-                  className={`tap mt-2 min-h-12 w-full rounded-2xl py-3 text-sm font-semibold disabled:opacity-60 ${
+                  className={`tap mt-2 min-h-12 w-full rounded-2xl py-3 text-sm font-semibold transition-colors disabled:opacity-60 ${
                     data.trip.status === "active"
-                      ? "bg-negative/10 text-negative"
-                      : "bg-brand text-white shadow-lg shadow-brand/25"
+                      ? "bg-negative/10 text-negative hover:bg-negative/15"
+                      : "bg-brand text-white shadow-lg shadow-brand/25 hover:shadow-xl"
                   }`}
                 >
                   {data.trip.status === "active" ? "Archive this trip" : "Reactivate this trip"}
@@ -678,7 +678,7 @@ export default function TripsPage() {
                     className={`tap rounded-xl py-2.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
                       effectiveInviteMode === "existing"
                         ? "bg-surface-strong text-brand shadow-sm"
-                        : "text-ink-muted"
+                        : "text-ink-muted hover:text-ink"
                     }`}
                   >
                     Existing guest
@@ -690,7 +690,7 @@ export default function TripsPage() {
                     className={`tap rounded-xl py-2.5 text-xs font-semibold transition-colors ${
                       effectiveInviteMode === "new"
                         ? "bg-surface-strong text-brand shadow-sm"
-                        : "text-ink-muted"
+                        : "text-ink-muted hover:text-ink"
                     }`}
                   >
                     New guest
@@ -734,7 +734,7 @@ export default function TripsPage() {
                       busy ||
                       (effectiveInviteMode === "existing" ? !inviteMemberId : !inviteNewName.trim())
                     }
-                    className="tap w-full min-h-12 rounded-2xl bg-brand py-3 text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+                    className="tap w-full min-h-12 rounded-2xl bg-brand py-3 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
                   >
                     Generate invite link
                   </button>
@@ -752,7 +752,7 @@ export default function TripsPage() {
                       <button
                         type="button"
                         onClick={() => handleCopyLink(generatedInvite.link)}
-                        className="tap flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl bg-surface-strong text-xs font-semibold"
+                        className="tap flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl bg-surface-strong text-xs font-semibold transition-shadow hover:shadow-md"
                       >
                         <LinkIcon className="size-4" />
                         {copied ? "Copied!" : "Copy"}
@@ -761,7 +761,7 @@ export default function TripsPage() {
                         href={whatsappShareUrl(generatedInvite.link, data.trip.name)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="tap flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl bg-surface-strong text-xs font-semibold"
+                        className="tap flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl bg-surface-strong text-xs font-semibold transition-shadow hover:shadow-md"
                       >
                         <WhatsAppIcon className="size-4" />
                         WhatsApp
@@ -776,7 +776,7 @@ export default function TripsPage() {
                               data.trip!.name,
                             )
                           }
-                          className="tap flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl bg-surface-strong text-xs font-semibold"
+                          className="tap flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl bg-surface-strong text-xs font-semibold transition-shadow hover:shadow-md"
                         >
                           <ShareIcon className="size-4" />
                           Share
@@ -808,14 +808,14 @@ export default function TripsPage() {
                             onClick={() => handleCopyLink(buildInviteLink(inv.token))}
                             disabled={busy || expired}
                             aria-label="Copy invite link"
-                            className="tap rounded-full px-2.5 py-1.5 text-xs font-semibold text-brand disabled:opacity-40"
+                            className="tap rounded-full px-2.5 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand-soft disabled:opacity-40"
                           >
                             <LinkIcon className="size-4" />
                           </button>
                           <button
                             onClick={() => handleRevoke(inv.id)}
                             disabled={busy}
-                            className="tap rounded-full px-3 py-1.5 text-xs font-semibold text-negative disabled:opacity-60"
+                            className="tap rounded-full px-3 py-1.5 text-xs font-semibold text-negative transition-colors hover:bg-negative/10 disabled:opacity-60"
                           >
                             Revoke
                           </button>
@@ -849,7 +849,7 @@ export default function TripsPage() {
                   <button
                     type="submit"
                     disabled={transferring || !transferTargetId}
-                    className="tap shrink-0 rounded-2xl bg-line px-4 text-sm font-semibold text-ink disabled:opacity-60"
+                    className="tap shrink-0 rounded-2xl bg-line px-4 text-sm font-semibold text-ink transition-[filter] hover:brightness-95 disabled:opacity-60"
                   >
                     Transfer
                   </button>
@@ -872,7 +872,7 @@ export default function TripsPage() {
                 <button
                   onClick={() => setPendingDeleteTrip(true)}
                   disabled={deleteConfirmText.trim() !== data.trip.name}
-                  className="tap mt-2 min-h-12 w-full rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative disabled:opacity-40"
+                  className="tap mt-2 min-h-12 w-full rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative transition-colors hover:bg-negative/15 disabled:opacity-40"
                 >
                   Delete this trip
                 </button>
@@ -968,7 +968,7 @@ function Header() {
   return (
     <header className="anim-fade-up flex items-start justify-between pt-2">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Trips</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Trips</h1>
         <p className="mt-1 text-sm text-ink-muted">
           Switch trips, invite people, manage members.
         </p>

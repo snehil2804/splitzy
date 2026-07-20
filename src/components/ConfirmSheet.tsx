@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 
 interface ConfirmSheetProps {
   open: boolean;
@@ -27,24 +27,13 @@ export function ConfirmSheet({
   onConfirm,
   onCancel,
 }: ConfirmSheetProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onCancel]);
+  const dialogRef = useDialogA11y(open, onCancel);
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-50 flex items-end justify-center md:items-center"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -54,7 +43,11 @@ export function ConfirmSheet({
         onClick={onCancel}
         className="anim-fade-in absolute inset-0 bg-black/40 backdrop-blur-[2px]"
       />
-      <div className="anim-sheet-up glass relative m-3 w-full max-w-sm rounded-[2rem] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="anim-dialog-in glass relative m-3 w-full max-w-sm rounded-[2rem] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] outline-none"
+      >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line" />
         <h2 className="text-center text-lg font-semibold">{title}</h2>
         <p className="mt-1.5 text-center text-sm leading-relaxed text-ink-muted">
@@ -64,14 +57,15 @@ export function ConfirmSheet({
           <button
             onClick={onConfirm}
             disabled={busy}
-            className="tap rounded-2xl bg-negative py-3.5 text-sm font-semibold text-white shadow-lg shadow-negative/25 disabled:opacity-60"
+            className="tap rounded-2xl bg-negative py-3.5 text-sm font-semibold text-white shadow-lg shadow-negative/25 transition-shadow hover:shadow-xl disabled:opacity-60"
           >
             {busy ? busyLabel : confirmLabel}
           </button>
           <button
             onClick={onCancel}
             disabled={busy}
-            className="tap rounded-2xl bg-line py-3.5 text-sm font-semibold"
+            data-autofocus
+            className="tap rounded-2xl bg-line py-3.5 text-sm font-semibold transition-[filter] hover:brightness-95"
           >
             {cancelLabel}
           </button>

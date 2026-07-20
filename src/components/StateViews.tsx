@@ -58,7 +58,7 @@ export function ErrorState({
       )}
       <button
         onClick={onRetry}
-        className="tap mt-2 inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/25"
+        className="tap mt-2 inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl"
       >
         <RefreshIcon className="size-4" />
         Try again
@@ -86,13 +86,13 @@ export function AccessDeniedState({ onRetry }: { onRetry: () => void }) {
       <div className="mt-1 flex items-center gap-2">
         <Link
           href="/trips"
-          className="tap inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/25"
+          className="tap inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl"
         >
           Go to trips
         </Link>
         <button
           onClick={onRetry}
-          className="tap inline-flex items-center gap-2 rounded-full bg-line/60 px-5 py-2.5 text-sm font-semibold"
+          className="tap inline-flex items-center gap-2 rounded-full bg-line/60 px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-line"
         >
           <RefreshIcon className="size-4" />
           Retry

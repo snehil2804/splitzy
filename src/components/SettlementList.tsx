@@ -107,7 +107,7 @@ export function SettlementList({
                   setExpandedKey(expanded ? null : key);
                 }
               }}
-              className="tap flex items-center gap-3 p-3.5"
+              className="tap flex items-center gap-3 p-3.5 transition-colors hover:bg-line"
             >
               <Avatar name={s.from.name} size="sm" />
               <ArrowRightIcon className="size-4 shrink-0 text-ink-faint" />
@@ -136,7 +136,7 @@ export function SettlementList({
                   }}
                   disabled={settling}
                   aria-label={`Mark ${s.from.name} → ${s.to.name} as paid`}
-                  className="tap grid size-8 shrink-0 place-items-center rounded-full bg-positive/10 text-positive disabled:opacity-50"
+                  className="tap grid size-8 shrink-0 place-items-center rounded-full bg-positive/10 text-positive transition-colors hover:bg-positive/20 disabled:opacity-50"
                 >
                   <CheckIcon className="size-4" strokeWidth={2.4} />
                 </button>

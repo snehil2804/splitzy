@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 import { getExpensePermissions } from "@/lib/expensePermissions";
 import { formatFullDateTime, formatINR } from "@/lib/format";
 import type { Expense, Member, SplitType } from "@/lib/types";
@@ -44,6 +45,7 @@ export function ExpenseDetailSheet({
   onDeleteRequest,
 }: ExpenseDetailSheetProps) {
   const [showTechnical, setShowTechnical] = useState(false);
+  const dialogRef = useDialogA11y(true, onClose);
 
   const paidByMember = membersById.get(expense.paidById);
   const loggedByMember = expense.createdBy
@@ -59,7 +61,7 @@ export function ExpenseDetailSheet({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-50 flex items-end justify-center md:items-center"
       role="dialog"
       aria-modal="true"
       aria-label="Expense details"
@@ -70,7 +72,11 @@ export function ExpenseDetailSheet({
         onClick={onClose}
         className="anim-fade-in absolute inset-0 bg-black/40 backdrop-blur-[2px]"
       />
-      <div className="anim-sheet-up glass relative flex max-h-[90vh] w-full max-w-sm flex-col rounded-t-[2rem] pb-[env(safe-area-inset-bottom)]">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="anim-dialog-in glass relative flex max-h-[90vh] w-full max-w-sm flex-col rounded-t-[2rem] pb-[env(safe-area-inset-bottom)] outline-none md:max-w-md md:rounded-[2rem] md:pb-0"
+      >
         <div className="flex items-center justify-between px-5 pt-5">
           <h2 className="text-lg font-semibold">Expense details</h2>
           <button
@@ -183,7 +189,7 @@ export function ExpenseDetailSheet({
             <button
               type="button"
               onClick={() => setShowTechnical((v) => !v)}
-              className="tap flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wider text-ink-faint"
+              className="tap flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wider text-ink-faint transition-colors hover:text-ink-muted"
             >
               Technical details
               <ChevronRightIcon
@@ -225,7 +231,7 @@ export function ExpenseDetailSheet({
                 <button
                   type="button"
                   onClick={() => onEdit(expense)}
-                  className="tap flex flex-1 items-center justify-center gap-2 rounded-2xl bg-line/60 py-3 text-sm font-semibold"
+                  className="tap flex flex-1 items-center justify-center gap-2 rounded-2xl bg-line/60 py-3 text-sm font-semibold transition-colors hover:bg-line"
                 >
                   <PencilIcon className="size-4" />
                   Edit
@@ -235,7 +241,7 @@ export function ExpenseDetailSheet({
                 <button
                   type="button"
                   onClick={() => onDeleteRequest(expense)}
-                  className="tap flex flex-1 items-center justify-center gap-2 rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative"
+                  className="tap flex flex-1 items-center justify-center gap-2 rounded-2xl bg-negative/10 py-3 text-sm font-semibold text-negative transition-colors hover:bg-negative/15"
                 >
                   <TrashIcon className="size-4" />
                   Delete

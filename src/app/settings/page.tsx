@@ -55,14 +55,14 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <header className="anim-fade-up pt-2">
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Settings</h1>
         <p className="mt-1 text-sm text-ink-muted">Make Splitzy feel like yours.</p>
       </header>
 
       {/* Profile shortcut — identity comes from your account, not a picker */}
       <Link
         href="/profile"
-        className="tap anim-fade-up glass flex min-h-14 items-center gap-3 rounded-3xl p-5"
+        className="tap anim-fade-up glass glass-interactive flex min-h-14 items-center gap-3 rounded-3xl p-5"
       >
         <Avatar
           name={myMember?.name ?? session?.user.email ?? "?"}
@@ -82,7 +82,7 @@ export default function SettingsPage() {
       {/* Invitations — badge shown only when something's waiting */}
       <Link
         href="/invitations"
-        className="tap anim-fade-up glass flex min-h-14 items-center gap-3 rounded-3xl p-5"
+        className="tap anim-fade-up glass glass-interactive flex min-h-14 items-center gap-3 rounded-3xl p-5"
         style={{ animationDelay: "30ms" }}
       >
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
@@ -114,7 +114,7 @@ export default function SettingsPage() {
                 className={`tap flex min-h-11 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
                   selected
                     ? "bg-surface-strong text-brand shadow-sm"
-                    : "text-ink-muted"
+                    : "text-ink-muted hover:text-ink"
                 }`}
               >
                 <Icon className="size-4" />
@@ -133,7 +133,7 @@ export default function SettingsPage() {
         <h2 className="text-sm font-semibold">Trip</h2>
         <Link
           href="/trips"
-          className="tap mt-3 flex min-h-14 items-center gap-3 rounded-2xl bg-line/60 p-4"
+          className="tap flex min-h-14 items-center gap-3 rounded-2xl bg-line/60 p-4 transition-colors hover:bg-line mt-3"
         >
           <span className="text-2xl">🧳</span>
           <span className="min-w-0 flex-1">

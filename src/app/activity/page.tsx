@@ -53,7 +53,7 @@ export default function ActivityPage() {
   return (
     <div className="space-y-6">
       <header className="anim-fade-up pt-2">
-        <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Activity</h1>
         <p className="mt-1 text-sm text-ink-muted">
           Everything that&apos;s happened on this trip.
         </p>

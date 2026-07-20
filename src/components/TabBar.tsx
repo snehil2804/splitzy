@@ -20,7 +20,7 @@ export function TabBar() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
     >
       <div className="glass flex items-center justify-between rounded-[1.75rem] px-3 py-2">
         {TABS.map(({ href, label, Icon, ...tab }) => {

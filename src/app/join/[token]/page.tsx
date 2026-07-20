@@ -123,7 +123,7 @@ export default function JoinPage() {
 function Header() {
   return (
     <header className="anim-fade-up pt-10 text-center">
-      <h1 className="text-2xl font-bold tracking-tight">You&apos;re invited</h1>
+      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">You&apos;re invited</h1>
     </header>
   );
 }

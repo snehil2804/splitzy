@@ -106,6 +106,31 @@ body {
   transform: scale(0.97);
 }
 
+/* Keyboard-only focus ring — never shows on a mouse/touch click, only when
+   navigating with Tab, so it adds zero visual change for existing users. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Subtle hover lift for clickable glass cards; hover-capable pointers only,
+   so it never sticks after a tap on touch devices. */
+@media (hover: hover) {
+  .glass-interactive {
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  }
+  .glass-interactive:hover {
+    box-shadow: 0 2px 4px rgba(23, 19, 31, 0.06), 0 16px 36px -16px rgba(23, 19, 31, 0.22);
+    border-color: color-mix(in srgb, var(--brand) 30%, var(--line));
+    transform: translateY(-1px);
+  }
+}
+
+[data-theme="dark"] .glass-interactive:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 20px 44px -20px rgba(0, 0, 0, 0.7);
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
@@ -144,6 +169,17 @@ body {
   }
 }
 
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 @keyframes float {
   0%,
   100% {
@@ -162,8 +198,16 @@ body {
   animation: fade-in 0.25s ease both;
 }
 
-.anim-sheet-up {
+/* Sheets/modals: slide up from the bottom on mobile (native sheet feel),
+   fade + scale in from the center at desktop widths (native dialog feel). */
+.anim-dialog-in {
   animation: sheet-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (min-width: 768px) {
+  .anim-dialog-in {
+    animation: modal-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
 }
 
 .anim-float {

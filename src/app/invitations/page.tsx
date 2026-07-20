@@ -127,14 +127,14 @@ export default function InvitationsPage() {
                 <button
                   onClick={() => handleDecline(inv)}
                   disabled={busyId === inv.id}
-                  className="tap min-h-11 rounded-2xl bg-line/60 text-sm font-semibold disabled:opacity-60"
+                  className="tap min-h-11 rounded-2xl bg-line/60 text-sm font-semibold transition-colors hover:bg-line disabled:opacity-60"
                 >
                   Decline
                 </button>
                 <button
                   onClick={() => handleAccept(inv)}
                   disabled={busyId === inv.id}
-                  className="tap min-h-11 rounded-2xl bg-gradient-to-br from-brand to-accent text-sm font-semibold text-white shadow-lg shadow-brand/25 disabled:opacity-60"
+                  className="tap min-h-11 rounded-2xl bg-gradient-to-br from-brand to-accent text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
                 >
                   {busyId === inv.id ? "…" : "Accept"}
                 </button>
@@ -158,7 +158,7 @@ function Header() {
     <header className="anim-fade-up pt-2">
       <div className="flex items-center gap-2">
         <MailIcon className="size-6 text-brand" strokeWidth={2} />
-        <h1 className="text-2xl font-bold tracking-tight">Invitations</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Invitations</h1>
       </div>
       <p className="mt-1 text-sm text-ink-muted">
         Trips people have invited you to join.
