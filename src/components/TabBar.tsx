@@ -15,7 +15,8 @@ const TABS = [
 export function TabBar() {
   const pathname = usePathname();
 
-  if (pathname === "/login" || pathname.startsWith("/join/")) return null;
+  if (pathname === "/login" || pathname.startsWith("/join/") || pathname.startsWith("/offline"))
+    return null;
 
   return (
     <nav

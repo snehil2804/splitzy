@@ -35,7 +35,8 @@ export function Sidebar() {
   const { data } = useTripData();
   const { session } = useSession();
 
-  if (pathname === "/login" || pathname.startsWith("/join/")) return null;
+  if (pathname === "/login" || pathname.startsWith("/join/") || pathname.startsWith("/offline"))
+    return null;
 
   const myMember = data?.myMemberId
     ? data.members.find((m) => m.id === data.myMemberId)

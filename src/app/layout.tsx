@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import { AutoSyncTrigger } from "@/components/AutoSyncTrigger";
+import { OfflineCacheWarmer } from "@/components/OfflineCacheWarmer";
+import { OfflineRedirector } from "@/components/OfflineRedirector";
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import { Sidebar } from "@/components/Sidebar";
 import { TabBar } from "@/components/TabBar";
 import "./globals.css";
@@ -58,6 +62,10 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} antialiased`} suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <ServiceWorkerRegistrar />
+        <OfflineRedirector />
+        <OfflineCacheWarmer />
+        <AutoSyncTrigger />
         <div aria-hidden className="app-glow pointer-events-none fixed inset-0" />
         <div className="md:flex">
           <Sidebar />

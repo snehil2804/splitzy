@@ -31,3 +31,6 @@ export type ThemePreference = "system" | "light" | "dark";
 
 /** Amounts within this many rupees are treated as settled. */
 export const SETTLED_EPSILON = 1;
+
+/** Shared by the online and offline Add Expense forms. */
+export const PAYMENT_SUGGESTIONS = ["Cash", "GPay", "PhonePe", "Card"];
