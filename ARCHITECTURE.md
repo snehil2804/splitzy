@@ -98,7 +98,8 @@ Offline is a **separate, deliberately smaller mode**, not the live app running o
 - **Multi-account safety is structural, not procedural.** There is no "list all queued expenses" export — the only listing function takes a `userId`. A second account on the same device therefore *cannot* be shown or sync the first account's queue, because the code to do so doesn't exist.
 - **Idempotency is enforced by the database, not the client.** Each queued record carries a key generated once at creation and preserved across edits; `add_expense()` returns the existing row for a `(creator, key)` pair rather than inserting again, backed by a partial unique index. Retrying a sync is therefore safe by construction — no client-side "don't double-submit" discipline required.
 - **Nothing is deleted locally until the server confirms it.** A failed sync — including one caused by expired auth — keeps the record with a human-readable error. One bad item never blocks the rest of the queue.
-- **The service worker's scope is narrow on purpose** (`public/sw.js`): same-origin GETs only, never `/api/*`, never cross-origin. It precaches the offline shell **and the JS chunks that shell needs to hydrate** — caching the HTML alone is useless, because these are client components whose server-rendered HTML is just a "Loading…" placeholder. Chunk URLs are scraped from the served HTML at install rather than hardcoded, so it survives every rebuild without a build step.
+- **The service worker's scope is narrow on purpose** (`public/sw.js`): same-origin GETs only, never `/api/*`, never cross-origin. It precaches the offline shell **and the JS chunks that shell needs to hydrate** — caching the HTML alone is useless, because these are client components whose server-rendered HTML is just a "Loading…" placeholder. Chunk URLs are scraped from the served HTML at install rather than hardcoded, so it survives every rebuild without a build step. `/sw.js` must stay excluded from the proxy matcher: it isn't a page, and gating it makes a signed-out request redirect to `/login`, which is not a loadable worker script.
+- **The offline routes carry no Supabase SDK — and that's a constraint to preserve, not an accident.** It was ~256 kB (a quarter of the route's JS) loaded purely for a `getSession()` that cannot succeed with the radios off. Two mechanisms hold the line: `useOfflineBootstrap` answers "who is signed in" from an `active_user_id` marker in IndexedDB (written by the online app, cleared on sign-out) instead of `useSession()`; and every Supabase-touching shell component lives in `OnlineShell`, loaded via `ShellGate`, which renders nothing on `/offline*` so the chunk is never requested. Adding a Supabase-dependent component straight to the root layout silently undoes this. To check: scrape `/offline`'s HTML for `/_next/static/*` URLs, fetch each, grep for `GoTrueClient` — it must not appear.
 
 ## Performance budget
 
@@ -124,12 +125,15 @@ src/
   components/     TabBar, Sidebar, ExpenseCard, ExpenseDetailSheet,
                   SettlementList, ConfirmSheet, Avatar, SplitFields,
                   AnimatedNumber, Skeleton, StateViews, LocationPicker, icons
-                  + ServiceWorkerRegistrar, OfflineRedirector,
-                    OfflineCacheWarmer, AutoSyncTrigger (render nothing —
-                    root-layout side effects)
+                  + ServiceWorkerRegistrar, OfflineRedirector (render
+                    nothing — root-layout side effects, both SDK-free)
+                  + ShellGate → OnlineShell (Sidebar + OfflineCacheWarmer +
+                    AutoSyncTrigger) — every Supabase-dependent shell part,
+                    code-split so /offline never loads it
   hooks/          useTripData, useSelectedTrip, useSession, useTheme,
                   useOnlineStatus, useOfflineQueue, useOfflineBootstrap,
                   useOfflineGps, useAutoSync, useCurrentLocation
+                  (the offline ones are deliberately Supabase-free)
   lib/            data + domain layer (see above)
                   + offlineDb, offlineSync, offlineTypes
 ```

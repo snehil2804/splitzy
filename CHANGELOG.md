@@ -1,5 +1,17 @@
 # Changelog
 
+## [Offline perf] — Supabase SDK removed from the offline critical path (`main` @ `8f24cfc`)
+
+`/offline` went from **1009 kB across 14 assets to 730 kB across 12** (−280 kB, −28%), with the auth SDK verified absent from every chunk it loads — checked against the deployed production site, not only locally. `/login` still carries it, as it must. The SDK was there purely so `useSession()` could call `getSession()`, which offline cannot succeed at anyway: with the radios off its token refresh never settles, which is what originally hung the screen on "Loading…".
+
+- **Offline identity now comes from IndexedDB, not the session.** `offline_sync_metadata` gained `active_user_id`, written by the online app on every session change and cleared explicitly in `signOut()` (which clears *only* the marker — queued expenses are deliberately left untouched, so unsynced work survives a sign-out). Three states are deliberately distinct: a string (signed in), `null` (explicitly signed out → show nothing from the cache), `undefined` (device predating the field → falls back to the most recently cached identity, exactly as it already did). This also deleted the 2.5 s fallback timeout — there's no longer a network call to race.
+- **The Supabase-dependent shell is code-split away from the offline routes.** `Sidebar`, `OfflineCacheWarmer` and `AutoSyncTrigger` moved into `OnlineShell`, loaded through `ShellGate`, which renders nothing on `/offline*` — so that chunk is never even requested there. SSR is deliberately left enabled on the gate, so the desktop sidebar is still in the initial HTML with no layout shift; verified by fetching the dashboard with a real session cookie and confirming `<aside>` and its nav labels are in the server-rendered markup.
+- **`useAutoSync` is now SDK-free** (takes `userId` as an argument instead of reading the session), so the offline screen calls it directly and keeps the full documented trigger set — `online` event, foreground return, post-sign-in. A narrower fix would have silently dropped the visibility trigger there along with `AutoSyncTrigger`.
+
+## [Fix] — `/sw.js` was auth-gated, so service worker registration failed when signed out (`main` @ `7b6d5a1`)
+
+Caught by the post-deploy production smoke check: `/sw.js` answered `307`, not `200`. The proxy matcher excludes the generated favicon/icon/manifest routes but not `sw.js`, so the worker script was treated as a gated page — a signed-out request redirected to `/login`, and a redirect to an HTML document is not a loadable worker script, so registration failed outright and that device got **no offline shell whatsoever**. Never surfaced in testing because registration normally happens on a page load while already signed in, where the session cookie let it through; a first visit before sign-in silently got nothing. Excluded from the matcher; verified serving `200 application/javascript` with the real worker source.
+
 ## [Offline Expense Queue] — capture expenses with no connectivity (`main` @ `fa473d7`)
 
 Record expenses on a mountain trip with no signal; they queue on the device and sync themselves when the connection returns. Online behavior is untouched — every existing screen, query, RPC, and permission rule works exactly as before.

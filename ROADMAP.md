@@ -24,7 +24,7 @@ Responsive shell with a persistent desktop sidebar (the bottom tab bar became mo
 
 Capture expenses with no connectivity and sync them when it returns. Dedicated Offline Mode (never the live app on stale data), an IndexedDB queue scoped per authenticated user, a service-worker app shell that precaches its own JS so it actually hydrates offline, and a secure sync endpoint with database-enforced idempotency. Foreground sync only — Background Sync is deliberately unused, since it isn't dependable on iOS.
 
-**Possible follow-up**: evict the Supabase auth SDK (~256 kB) from the offline critical path. It's the largest remaining win for offline load speed, but it requires restructuring how the root layout loads on every route, so it was left as a deliberate decision rather than slipped in.
+**Follow-up, now shipped**: the Supabase auth SDK is off the offline critical path. `/offline` went from 1009 kB across 14 assets to **730 kB across 12** (−28%), with the SDK verified absent from every chunk it loads in production. Offline Mode answers "who is signed in" from an IndexedDB marker written by the online app, and the Supabase-dependent shell is code-split behind a gate that never renders on `/offline*`.
 
 ## Phase 3 — Apple Shortcut
 
