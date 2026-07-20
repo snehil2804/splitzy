@@ -5,14 +5,14 @@ import { useEffect, useState } from "react";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from "@/components/icons";
 import { EmptyState } from "@/components/StateViews";
-import { useOfflineIdentity } from "@/hooks/useOfflineIdentity";
+import { useOfflineBootstrap } from "@/hooks/useOfflineBootstrap";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { expenseEmoji } from "@/lib/emoji";
 import { formatFullDateTime, formatINR } from "@/lib/format";
-import { getLatestReferenceDataForUser, hasQueuedExpensesForOtherUser } from "@/lib/offlineDb";
+import { hasQueuedExpensesForOtherUser } from "@/lib/offlineDb";
 import { syncPendingExpenses } from "@/lib/offlineSync";
-import type { OfflineExpense, OfflineReferenceData } from "@/lib/offlineTypes";
+import type { OfflineExpense } from "@/lib/offlineTypes";
 
 const STATUS_LABEL: Record<OfflineExpense["sync_status"], string> = {
   pending: "Pending sync",
@@ -27,12 +27,10 @@ const STATUS_LABEL: Record<OfflineExpense["sync_status"], string> = {
  * everything from IndexedDB (`offlineDb.ts`); never fetches live data.
  */
 export default function OfflinePage() {
-  const { status: identityStatus, userId, usingCachedIdentity } = useOfflineIdentity();
+  const { status: bootstrapStatus, userId, reference, usingCachedIdentity } = useOfflineBootstrap();
   const online = useOnlineStatus();
   const { status: queueStatus, expenses, pendingCount, failedCount, removeExpense } = useOfflineQueue(userId);
 
-  // `undefined` = still checking IndexedDB; `null` = checked, nothing cached.
-  const [reference, setReference] = useState<OfflineReferenceData | null | undefined>(undefined);
   const [pendingDelete, setPendingDelete] = useState<OfflineExpense | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [manualSyncing, setManualSyncing] = useState(false);
@@ -42,17 +40,6 @@ export default function OfflinePage() {
   const [otherAccountHasQueue, setOtherAccountHasQueue] = useState(false);
 
   const isSyncingNow = expenses.some((e) => e.sync_status === "syncing");
-
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    getLatestReferenceDataForUser(userId).then((data) => {
-      if (!cancelled) setReference(data ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -90,18 +77,16 @@ export default function OfflinePage() {
     }
   }
 
-  if (identityStatus === "loading" || (userId && reference === undefined)) {
+  if (bootstrapStatus === "loading") {
     return (
       <div className="space-y-6">
         <Header />
-        <div className="glass anim-fade-up rounded-3xl p-5 text-center text-sm text-ink-muted">
-          Loading…
-        </div>
+        <div className="glass rounded-3xl p-5 text-center text-sm text-ink-muted">Loading…</div>
       </div>
     );
   }
 
-  if (identityStatus === "signed-out" || !userId) {
+  if (bootstrapStatus === "signed-out" || !userId) {
     return (
       <div className="space-y-6">
         <Header />
@@ -134,14 +119,14 @@ export default function OfflinePage() {
       {online && (
         <Link
           href="/"
-          className="tap anim-fade-up flex items-center justify-center gap-1.5 text-sm font-semibold text-brand transition-opacity hover:opacity-70"
+          className="tap flex items-center justify-center gap-1.5 text-sm font-semibold text-brand transition-opacity hover:opacity-70"
         >
           Continue to Splitzy
         </Link>
       )}
 
       {otherAccountHasQueue && (
-        <section className="anim-fade-up rounded-2xl bg-line/60 p-4 text-center">
+        <section className="rounded-2xl bg-line/60 p-4 text-center">
           <p className="text-xs leading-relaxed text-ink-muted">
             Another account has offline expenses waiting on this device. Sign in as that account
             to review or sync them — they&apos;re never shown or synced under a different account.
@@ -149,7 +134,7 @@ export default function OfflinePage() {
         </section>
       )}
 
-      <section className="anim-fade-up glass rounded-3xl p-5 text-center">
+      <section className="glass rounded-3xl p-5 text-center">
         <p className="text-sm leading-relaxed text-ink-muted">
           {online
             ? "You're back online. Expenses saved here will sync automatically."
@@ -164,7 +149,7 @@ export default function OfflinePage() {
         </Link>
       </section>
 
-      <section className="anim-fade-up glass rounded-3xl p-5">
+      <section className="glass rounded-3xl p-5">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-ink-muted">Pending sync: {pendingCount}</h2>
           {online && pendingCount > 0 && (
@@ -181,7 +166,7 @@ export default function OfflinePage() {
         </div>
 
         {manualSyncResult && (
-          <p className="anim-fade-in mt-2 text-xs font-medium text-ink-muted">
+          <p className="mt-2 text-xs font-medium text-ink-muted">
             {manualSyncResult.failed === 0
               ? manualSyncResult.synced > 0
                 ? "All offline expenses synced"
@@ -306,7 +291,7 @@ function Header({
   })();
 
   return (
-    <header className="anim-fade-up pt-2">
+    <header className="pt-2">
       <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Offline Mode</h1>
       {statusText && (
         <p

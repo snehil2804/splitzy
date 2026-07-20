@@ -126,9 +126,9 @@ export async function getLatestReferenceDataForUser(
 /**
  * The `user_id` from whichever cached reference data was written most
  * recently on this device — a network-free fallback for "who is signed in"
- * when the live session hasn't resolved (see `useOfflineIdentity`). Never
- * used to list or sync expense data itself; every read of that still goes
- * through the userId-scoped functions above.
+ * when the live session hasn't resolved. Never used to list or sync expense
+ * data itself; every read of that still goes through the userId-scoped
+ * functions above.
  */
 export async function getMostRecentCachedUserId(): Promise<string | null> {
   const db = await getDb();
@@ -136,6 +136,34 @@ export async function getMostRecentCachedUserId(): Promise<string | null> {
   if (all.length === 0) return null;
   all.sort((a, b) => b.cached_at.localeCompare(a.cached_at));
   return all[0].user_id;
+}
+
+/**
+ * Resolves "who is signed in on this device" and "what does the offline
+ * form need" from a **single** scan of the reference-data store.
+ *
+ * These used to be two separate full scans run strictly in sequence
+ * (identity first, then reference data keyed by the identity it returned),
+ * which meant Offline Mode couldn't paint until two IndexedDB round-trips
+ * had completed — noticeably slow on a phone, where the first open of the
+ * database is itself not cheap.
+ *
+ * `sessionUserId` is the confirmed live session's user when there is one.
+ * Passing `null` opts into the cached-identity fallback: the most recently
+ * cached account on this device wins. Callers must only do that when the
+ * session is genuinely indeterminate — never when it has positively
+ * resolved to signed-out.
+ */
+export async function loadIdentityAndReference(
+  sessionUserId: string | null,
+): Promise<{ userId: string | null; reference: OfflineReferenceData | null }> {
+  const db = await getDb();
+  const all = await db.getAll("offline_reference_data");
+  if (all.length === 0) return { userId: sessionUserId, reference: null };
+  // Newest first, so the `find` below picks this user's freshest entry.
+  all.sort((a, b) => b.cached_at.localeCompare(a.cached_at));
+  const userId = sessionUserId ?? all[0].user_id;
+  return { userId, reference: all.find((r) => r.user_id === userId) ?? null };
 }
 
 // ── Sync metadata ────────────────────────────────────────────────────────────

@@ -6,12 +6,12 @@ import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
 import { ChevronRightIcon, CheckIcon, CrosshairIcon } from "@/components/icons";
 import { EmptyState } from "@/components/StateViews";
+import { useOfflineBootstrap } from "@/hooks/useOfflineBootstrap";
 import { useOfflineGps } from "@/hooks/useOfflineGps";
-import { useOfflineIdentity } from "@/hooks/useOfflineIdentity";
 import { refreshOfflineQueue } from "@/hooks/useOfflineQueue";
 import { formatINR } from "@/lib/format";
-import { getLatestReferenceDataForUser, getOfflineExpense, saveOfflineExpense } from "@/lib/offlineDb";
-import type { OfflineExpense, OfflineReferenceData } from "@/lib/offlineTypes";
+import { getOfflineExpense, saveOfflineExpense } from "@/lib/offlineDb";
+import type { OfflineExpense } from "@/lib/offlineTypes";
 
 type SplitMode = "everyone" | "custom";
 
@@ -33,9 +33,8 @@ function OfflineAddExpenseFlow() {
   const searchParams = useSearchParams();
   const editLocalId = searchParams.get("edit");
   const isEditing = editLocalId !== null;
-  const { status: identityStatus, userId } = useOfflineIdentity();
+  const { status: bootstrapStatus, userId, reference } = useOfflineBootstrap();
 
-  const [reference, setReference] = useState<OfflineReferenceData | null | undefined>(undefined);
   const [editingExpense, setEditingExpense] = useState<OfflineExpense | null | undefined>(
     isEditing ? undefined : null,
   );
@@ -55,17 +54,6 @@ function OfflineAddExpenseFlow() {
   const [saving, setSaving] = useState(false);
 
   const gps = useOfflineGps(!isEditing);
-
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    getLatestReferenceDataForUser(userId).then((data) => {
-      if (!cancelled) setReference(data ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
 
   useEffect(() => {
     if (!editLocalId) return;
@@ -200,7 +188,7 @@ function OfflineAddExpenseFlow() {
     }
   }
 
-  if (identityStatus === "loading" || (isEditing && editingExpense === undefined) || reference === undefined) {
+  if (bootstrapStatus === "loading" || (isEditing && editingExpense === undefined)) {
     return (
       <FormShell isEditing={isEditing}>
         <Loading />
@@ -208,7 +196,7 @@ function OfflineAddExpenseFlow() {
     );
   }
 
-  if (identityStatus === "signed-out" || !userId) {
+  if (bootstrapStatus === "signed-out" || !userId) {
     return (
       <FormShell isEditing={isEditing}>
         <EmptyState
@@ -247,7 +235,7 @@ function OfflineAddExpenseFlow() {
   return (
     <FormShell isEditing={isEditing}>
       <form onSubmit={handleSubmit} className="space-y-5">
-        <section className="anim-fade-up glass space-y-4 rounded-3xl p-5">
+        <section className="glass space-y-4 rounded-3xl p-5">
           <div>
             <label htmlFor="offline-description" className="text-sm font-semibold">
               What was it for?
@@ -297,7 +285,7 @@ function OfflineAddExpenseFlow() {
           </div>
         </section>
 
-        <section className="anim-fade-up glass rounded-3xl p-5" style={{ animationDelay: "60ms" }}>
+        <section className="glass rounded-3xl p-5">
           <h2 className="text-sm font-semibold">Who paid?</h2>
           <div className="mt-3 grid grid-cols-3 gap-2.5">
             {reference.members.map((m) => {
@@ -320,7 +308,7 @@ function OfflineAddExpenseFlow() {
           </div>
         </section>
 
-        <section className="anim-fade-up glass rounded-3xl p-5" style={{ animationDelay: "120ms" }}>
+        <section className="glass rounded-3xl p-5">
           <h2 className="text-sm font-semibold">Split equally with</h2>
           <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-line/60 p-1.5">
             <button
@@ -346,7 +334,7 @@ function OfflineAddExpenseFlow() {
           </div>
 
           {splitMode === "custom" && (
-            <div className="anim-fade-in mt-3 grid grid-cols-3 gap-2.5">
+            <div className="mt-3 grid grid-cols-3 gap-2.5">
               {reference.members.map((m) => {
                 const selected = selectedIds.has(m.id);
                 return (
@@ -380,7 +368,7 @@ function OfflineAddExpenseFlow() {
           )}
         </section>
 
-        <section className="anim-fade-up glass space-y-4 rounded-3xl p-5" style={{ animationDelay: "180ms" }}>
+        <section className="glass space-y-4 rounded-3xl p-5">
           <div>
             <h2 className="text-sm font-semibold">
               Payment method <span className="text-ink-faint">(optional)</span>
@@ -443,7 +431,7 @@ function OfflineAddExpenseFlow() {
         </section>
 
         {formError && (
-          <p className="anim-fade-in rounded-2xl bg-negative/10 p-4 text-center text-sm font-medium text-negative">
+          <p className="rounded-2xl bg-negative/10 p-4 text-center text-sm font-medium text-negative">
             {formError}
           </p>
         )}
@@ -463,7 +451,7 @@ function OfflineAddExpenseFlow() {
 function FormShell({ children, isEditing }: { children: React.ReactNode; isEditing?: boolean }) {
   return (
     <div className="space-y-6">
-      <header className="anim-fade-up pt-2">
+      <header className="pt-2">
         <Link
           href="/offline"
           className="tap flex items-center gap-0.5 text-xs font-semibold text-brand transition-opacity hover:opacity-70"
@@ -482,6 +470,6 @@ function FormShell({ children, isEditing }: { children: React.ReactNode; isEditi
 
 function Loading() {
   return (
-    <div className="glass anim-fade-up rounded-3xl p-5 text-center text-sm text-ink-muted">Loading…</div>
+    <div className="glass rounded-3xl p-5 text-center text-sm text-ink-muted">Loading…</div>
   );
 }

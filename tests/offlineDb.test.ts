@@ -11,6 +11,7 @@ import {
   getSyncMetadata,
   hasQueuedExpensesForOtherUser,
   listOfflineExpensesForUser,
+  loadIdentityAndReference,
   saveOfflineExpense,
   saveReferenceData,
   setSyncMetadata,
@@ -180,6 +181,77 @@ test("getMostRecentCachedUserId returns the user behind whichever cache entry is
 test("getMostRecentCachedUserId returns null when nothing has ever been cached", async () => {
   await __resetForTests();
   assert.equal(await getMostRecentCachedUserId(), null);
+});
+
+test("loadIdentityAndReference resolves identity and reference in one read, for a known session", async () => {
+  await __resetForTests();
+  await saveReferenceData(
+    referenceData({ trip_id: "bootstrap-mine", user_id: "user-bootstrap", trip_name: "Mine" }),
+  );
+  await saveReferenceData(
+    referenceData({ trip_id: "bootstrap-theirs", user_id: "someone-else", trip_name: "Theirs" }),
+  );
+
+  const result = await loadIdentityAndReference("user-bootstrap");
+  assert.equal(result.userId, "user-bootstrap");
+  assert.equal(result.reference?.trip_name, "Mine");
+});
+
+test("loadIdentityAndReference picks this user's *newest* trip when they have several", async () => {
+  await __resetForTests();
+  await saveReferenceData(
+    referenceData({
+      trip_id: "older-trip",
+      user_id: "user-multi",
+      trip_name: "Older",
+      cached_at: new Date(Date.now() - 60_000).toISOString(),
+    }),
+  );
+  await saveReferenceData(
+    referenceData({
+      trip_id: "newer-trip",
+      user_id: "user-multi",
+      trip_name: "Newer",
+      cached_at: new Date().toISOString(),
+    }),
+  );
+
+  const result = await loadIdentityAndReference("user-multi");
+  assert.equal(result.reference?.trip_name, "Newer");
+});
+
+test("loadIdentityAndReference falls back to the most recently cached account when given no session", async () => {
+  await __resetForTests();
+  await saveReferenceData(
+    referenceData({
+      trip_id: "fallback-old",
+      user_id: "user-old",
+      cached_at: new Date(Date.now() - 60_000).toISOString(),
+    }),
+  );
+  await saveReferenceData(
+    referenceData({
+      trip_id: "fallback-new",
+      user_id: "user-new",
+      cached_at: new Date().toISOString(),
+    }),
+  );
+
+  const result = await loadIdentityAndReference(null);
+  assert.equal(result.userId, "user-new");
+  assert.equal(result.reference?.trip_id, "fallback-new");
+});
+
+test("loadIdentityAndReference reports a signed-in user with no cached data, rather than inventing one", async () => {
+  await __resetForTests();
+  const result = await loadIdentityAndReference("user-with-nothing-cached");
+  assert.equal(result.userId, "user-with-nothing-cached");
+  assert.equal(result.reference, null);
+});
+
+test("loadIdentityAndReference on a totally fresh device yields no identity at all", async () => {
+  await __resetForTests();
+  assert.deepEqual(await loadIdentityAndReference(null), { userId: null, reference: null });
 });
 
 test("sync metadata defaults sensibly, then persists updates", async () => {
