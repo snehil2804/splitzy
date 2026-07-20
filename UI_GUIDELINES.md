@@ -30,7 +30,7 @@ Use them as Tailwind colors: `text-ink-muted`, `bg-brand-soft`, `text-positive`,
 - **Hero/gradient card:** `bg-gradient-to-br from-brand via-violet-500 to-accent` + a blurred white orb for depth.
 - **Pressable:** add `tap` to anything clickable.
 - **Money:** always `formatINR()` + `tabular-nums`. Positive nets green with `+`, negative red.
-- **Members:** `<Avatar name=… />` — per-member gradients (Snehil indigo, Shruti pink, Anshul amber) defined in `constants.ts`.
+- **Members:** `<Avatar name=… />` — a name hashes to one of 6 gradient styles (indigo, pink, amber, emerald, sky, fuchsia) defined in `constants.ts`, so any trip's members get consistent, distinct colors with no per-person configuration.
 - **Emoji:** every expense gets one via `expenseEmoji()`; section illustrations use a single large emoji in a `bg-brand-soft` rounded tile.
 
 ## Typography
