@@ -157,6 +157,7 @@ export default function DashboardPage() {
             </div>
             <SettlementList
               settlements={derived.settlements}
+              balances={derived.balances}
               identity={myMember?.name ?? null}
             />
           </section>

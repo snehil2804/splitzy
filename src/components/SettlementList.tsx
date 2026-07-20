@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { formatINR } from "@/lib/format";
-import type { Settlement } from "@/lib/types";
+import type { MemberBalance, Settlement } from "@/lib/types";
 import { Avatar } from "./Avatar";
 import { ArrowRightIcon, CheckIcon, ChevronRightIcon } from "./icons";
 
@@ -10,6 +10,13 @@ interface SettlementListProps {
   settlements: Settlement[];
   /** Name of the person using this device, for "You / you" framing. */
   identity?: string | null;
+  /**
+   * Full per-member balances, at their real (unrounded) precision — used
+   * only to state each debtor's exact overall total in the explanation
+   * panel. Optional: falls back to summing this debtor's (already-rounded)
+   * settlement amounts if omitted.
+   */
+  balances?: MemberBalance[];
   /** When provided, each row gets a "Mark as paid" action that records it. */
   onSettle?: (s: Settlement) => void;
   /** `${from.id}-${to.id}` of the settlement currently being recorded, if any. */
@@ -17,20 +24,36 @@ interface SettlementListProps {
 }
 
 /**
- * Explains why this specific transaction exists, in plain language, using
- * only the already-computed settlement list — no new balance math. When a
+ * Explains why this specific transaction exists, in plain language. When a
  * debtor's total is split across more than one creditor (the settlement
  * optimizer routes to whichever creditor is currently largest, not
  * necessarily who they "originally" owed for a given expense), this walks
  * through each piece so the routing doesn't look arbitrary.
+ *
+ * The per-piece amounts are always the real, already-computed settlement
+ * amounts — the exact figures shown on the row and recorded by "mark as
+ * paid" — never re-derived here. The one number this pulls from the raw
+ * balances (rather than the settlement list) is the debtor's overall total,
+ * so it reads as the true accounting figure rather than a sum of
+ * whole-rupee-rounded pieces (which can be a few paise off the real total).
+ * This never touches balances.ts or changes what gets recorded.
  */
-export function explainSettlement(settlement: Settlement, allSettlements: Settlement[]): string {
+export function explainSettlement(
+  settlement: Settlement,
+  allSettlements: Settlement[],
+  balances?: MemberBalance[],
+): string {
   const fromSettlements = allSettlements.filter((s) => s.from.id === settlement.from.id);
   if (fromSettlements.length <= 1) {
     return `This settles ${settlement.from.name}'s entire remaining balance on the trip.`;
   }
 
-  const total = fromSettlements.reduce((sum, s) => sum + s.amount, 0);
+  const exactBalance = balances?.find((b) => b.member.id === settlement.from.id)?.net;
+  const total =
+    exactBalance != null
+      ? Math.abs(exactBalance)
+      : fromSettlements.reduce((sum, s) => sum + s.amount, 0);
+
   const pieces = fromSettlements.map((s, i) => {
     const isFirst = i === 0;
     const isLast = i === fromSettlements.length - 1;
@@ -45,6 +68,7 @@ export function explainSettlement(settlement: Settlement, allSettlements: Settle
 export function SettlementList({
   settlements,
   identity,
+  balances,
   onSettle,
   settlingKey,
 }: SettlementListProps) {
@@ -120,7 +144,7 @@ export function SettlementList({
             </div>
             {expanded && (
               <div className="anim-fade-in border-t border-surface-strong/60 px-3.5 py-3 text-xs leading-relaxed text-ink-muted">
-                {explainSettlement(s, settlements)}
+                {explainSettlement(s, settlements, balances)}
               </div>
             )}
           </li>

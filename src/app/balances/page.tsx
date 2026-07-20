@@ -179,12 +179,14 @@ export default function BalancesPage() {
                 <h2 className="text-sm font-semibold text-ink-muted">How to settle up</h2>
                 <p className="mb-3.5 mt-1 flex items-start gap-1.5 text-xs leading-relaxed text-ink-faint">
                   <InfoIcon className="mt-0.5 size-3.5 shrink-0" />
-                  Optimized across all trip expenses to minimize the number of payments —
-                  the suggested payer may differ from who you originally split a specific
-                  expense with. Tap a row for details.
+                  Settlement suggestions are optimized across all trip expenses to minimize
+                  the total number of payments. The suggested payer may differ from the
+                  original expense because balances are netted across the entire trip. Tap a
+                  row for details.
                 </p>
                 <SettlementList
                   settlements={derived.settlements}
+                  balances={derived.balances}
                   identity={myName}
                   onSettle={handleSettle}
                   settlingKey={settlingKey}
