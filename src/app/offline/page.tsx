@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
-import { PencilIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from "@/components/icons";
 import { EmptyState } from "@/components/StateViews";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useSession } from "@/hooks/useSession";
 import { formatFullDateTime, formatINR } from "@/lib/format";
 import { getLatestReferenceDataForUser } from "@/lib/offlineDb";
+import { syncPendingExpenses } from "@/lib/offlineSync";
 import type { OfflineExpense, OfflineReferenceData } from "@/lib/offlineTypes";
 
 const STATUS_LABEL: Record<OfflineExpense["sync_status"], string> = {
@@ -28,12 +29,18 @@ export default function OfflinePage() {
   const { status: sessionStatus, session } = useSession();
   const online = useOnlineStatus();
   const userId = session?.user.id ?? null;
-  const { status: queueStatus, expenses, pendingCount, removeExpense } = useOfflineQueue(userId);
+  const { status: queueStatus, expenses, pendingCount, failedCount, removeExpense } = useOfflineQueue(userId);
 
   // `undefined` = still checking IndexedDB; `null` = checked, nothing cached.
   const [reference, setReference] = useState<OfflineReferenceData | null | undefined>(undefined);
   const [pendingDelete, setPendingDelete] = useState<OfflineExpense | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [manualSyncing, setManualSyncing] = useState(false);
+  const [manualSyncResult, setManualSyncResult] = useState<{ synced: number; failed: number } | null>(
+    null,
+  );
+
+  const isSyncingNow = expenses.some((e) => e.sync_status === "syncing");
 
   useEffect(() => {
     if (!userId) return;
@@ -54,6 +61,18 @@ export default function OfflinePage() {
       setPendingDelete(null);
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleSyncNow() {
+    if (!userId) return;
+    setManualSyncing(true);
+    setManualSyncResult(null);
+    try {
+      const result = await syncPendingExpenses(userId, { manual: true });
+      setManualSyncResult({ synced: result.syncedCount, failed: result.failedCount });
+    } finally {
+      setManualSyncing(false);
     }
   }
 
@@ -96,7 +115,7 @@ export default function OfflinePage() {
 
   return (
     <div className="space-y-6">
-      <Header online={online} />
+      <Header online={online} isSyncingNow={isSyncingNow} pendingCount={pendingCount} failedCount={failedCount} />
 
       <section className="anim-fade-up glass rounded-3xl p-5 text-center">
         <p className="text-sm leading-relaxed text-ink-muted">
@@ -114,7 +133,30 @@ export default function OfflinePage() {
       </section>
 
       <section className="anim-fade-up glass rounded-3xl p-5">
-        <h2 className="text-sm font-semibold text-ink-muted">Pending sync: {pendingCount}</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-ink-muted">Pending sync: {pendingCount}</h2>
+          {online && pendingCount > 0 && (
+            <button
+              type="button"
+              onClick={handleSyncNow}
+              disabled={manualSyncing || isSyncingNow}
+              className="tap flex shrink-0 items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/20 disabled:opacity-60"
+            >
+              <RefreshIcon className={`size-3.5 ${manualSyncing || isSyncingNow ? "animate-spin" : ""}`} />
+              {manualSyncing || isSyncingNow ? "Syncing…" : "Sync now"}
+            </button>
+          )}
+        </div>
+
+        {manualSyncResult && (
+          <p className="anim-fade-in mt-2 text-xs font-medium text-ink-muted">
+            {manualSyncResult.failed === 0
+              ? manualSyncResult.synced > 0
+                ? "All offline expenses synced"
+                : "Nothing to sync"
+              : `${manualSyncResult.synced} synced, ${manualSyncResult.failed} needs attention`}
+          </p>
+        )}
 
         {queueStatus === "loading" && <p className="mt-3 text-sm text-ink-muted">Loading…</p>}
 
@@ -190,13 +232,42 @@ export default function OfflinePage() {
   );
 }
 
-function Header({ online }: { online?: boolean }) {
+function Header({
+  online,
+  isSyncingNow,
+  pendingCount,
+  failedCount,
+}: {
+  online?: boolean;
+  isSyncingNow?: boolean;
+  pendingCount?: number;
+  failedCount?: number;
+}) {
+  const statusText = (() => {
+    if (online === undefined) return null;
+    if (!online) {
+      return pendingCount ? `Offline · ${pendingCount} pending` : "Offline";
+    }
+    if (isSyncingNow) {
+      return `Back online — syncing ${pendingCount ?? 0} ${pendingCount === 1 ? "expense" : "expenses"}`;
+    }
+    if (failedCount) {
+      return `${failedCount} ${failedCount === 1 ? "expense needs" : "expenses need"} attention`;
+    }
+    if (pendingCount === 0) return "All offline expenses synced";
+    return null;
+  })();
+
   return (
     <header className="anim-fade-up pt-2">
       <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Offline Mode</h1>
-      {online !== undefined && (
-        <p className={`mt-1 text-sm font-medium ${online ? "text-positive" : "text-ink-muted"}`}>
-          {online ? "Back online" : "Offline"}
+      {statusText && (
+        <p
+          className={`mt-1 text-sm font-medium ${
+            !online ? "text-ink-muted" : failedCount ? "text-negative" : "text-positive"
+          }`}
+        >
+          {statusText}
         </p>
       )}
     </header>

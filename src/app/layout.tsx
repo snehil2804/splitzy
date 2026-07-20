@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import { AutoSyncTrigger } from "@/components/AutoSyncTrigger";
 import { OfflineCacheWarmer } from "@/components/OfflineCacheWarmer";
 import { OfflineRedirector } from "@/components/OfflineRedirector";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
@@ -64,6 +65,7 @@ export default function RootLayout({
         <ServiceWorkerRegistrar />
         <OfflineRedirector />
         <OfflineCacheWarmer />
+        <AutoSyncTrigger />
         <div aria-hidden className="app-glow pointer-events-none fixed inset-0" />
         <div className="md:flex">
           <Sidebar />

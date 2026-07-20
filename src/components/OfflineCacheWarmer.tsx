@@ -5,6 +5,7 @@ import { useSession } from "@/hooks/useSession";
 import { useTripData } from "@/hooks/useTripData";
 import { PAYMENT_SUGGESTIONS } from "@/lib/constants";
 import { saveReferenceData } from "@/lib/offlineDb";
+import { syncPendingExpenses } from "@/lib/offlineSync";
 
 /**
  * Whenever the app successfully loads real trip data online, refreshes the
@@ -49,6 +50,10 @@ export function OfflineCacheWarmer() {
       fetch("/offline").catch(() => {});
       fetch("/offline/add").catch(() => {});
     }
+
+    // Reference data just refreshed, which means we're genuinely online —
+    // a good moment to also flush anything still queued.
+    syncPendingExpenses(userId).catch(() => {});
   }, [session, status, data]);
 
   return null;
