@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from "@/components/icons";
 import { EmptyState } from "@/components/StateViews";
+import { useAutoSync } from "@/hooks/useAutoSync";
 import { useOfflineBootstrap } from "@/hooks/useOfflineBootstrap";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -27,8 +28,12 @@ const STATUS_LABEL: Record<OfflineExpense["sync_status"], string> = {
  * everything from IndexedDB (`offlineDb.ts`); never fetches live data.
  */
 export default function OfflinePage() {
-  const { status: bootstrapStatus, userId, reference, usingCachedIdentity } = useOfflineBootstrap();
+  const { status: bootstrapStatus, userId, reference } = useOfflineBootstrap();
   const online = useOnlineStatus();
+  // The app-wide trigger lives in the Supabase-dependent shell, which is
+  // deliberately not loaded on these routes — so this screen runs the same
+  // hook itself. It's SDK-free: syncing posts to our own API with `fetch`.
+  useAutoSync(userId);
   const { status: queueStatus, expenses, pendingCount, failedCount, removeExpense } = useOfflineQueue(userId);
 
   const [pendingDelete, setPendingDelete] = useState<OfflineExpense | null>(null);
@@ -53,6 +58,7 @@ export default function OfflinePage() {
     // Re-checked whenever this account's own queue changes size — a good,
     // cheap proxy for "something on this device just changed."
   }, [userId, expenses.length]);
+
 
   async function confirmDelete() {
     if (!pendingDelete) return;
@@ -235,7 +241,6 @@ export default function OfflinePage() {
       <p className="text-center text-xs text-ink-faint">
         Trip and member information last updated on{" "}
         {formatFullDateTime(new Date(reference.cached_at))}.
-        {usingCachedIdentity && " Sign-in couldn't be freshly confirmed — using your last known identity on this device."}
       </p>
 
       {pendingCount > 0 && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { setActiveUserId } from "@/lib/offlineDb";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
@@ -71,4 +72,12 @@ export function useSession() {
 
 export async function signOut(): Promise<void> {
   await getSupabase().auth.signOut();
+  // Offline Mode reads this marker instead of the session (so it never has
+  // to load the auth SDK), so signing out has to clear it explicitly rather
+  // than relying on a particular component being mounted to notice. Note
+  // this clears only *who is signed in* — queued offline expenses are
+  // deliberately left untouched, so unsynced work survives a sign-out.
+  await setActiveUserId(null).catch((err) => {
+    console.error("Failed to clear the active user for offline mode:", err);
+  });
 }

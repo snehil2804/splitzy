@@ -188,3 +188,17 @@ export async function setSyncMetadata(patch: Partial<OfflineSyncMetadata>): Prom
   const current = await getSyncMetadata();
   await db.put("offline_sync_metadata", { ...current, ...patch, key: SYNC_METADATA_KEY });
 }
+
+/**
+ * Records who is signed in on this device — `null` when signed out. Called
+ * by the online app only. See `OfflineSyncMetadata.active_user_id` for why
+ * this exists and what `undefined` (never recorded) means.
+ */
+export async function setActiveUserId(userId: string | null): Promise<void> {
+  await setSyncMetadata({ active_user_id: userId });
+}
+
+/** `undefined` when never recorded — deliberately distinct from `null`. */
+export async function getActiveUserId(): Promise<string | null | undefined> {
+  return (await getSyncMetadata()).active_user_id;
+}

@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
-import { AutoSyncTrigger } from "@/components/AutoSyncTrigger";
-import { OfflineCacheWarmer } from "@/components/OfflineCacheWarmer";
 import { OfflineRedirector } from "@/components/OfflineRedirector";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
-import { Sidebar } from "@/components/Sidebar";
+import { ShellGate } from "@/components/ShellGate";
 import { TabBar } from "@/components/TabBar";
 import "./globals.css";
 
@@ -64,11 +62,12 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <ServiceWorkerRegistrar />
         <OfflineRedirector />
-        <OfflineCacheWarmer />
-        <AutoSyncTrigger />
         <div aria-hidden className="app-glow pointer-events-none fixed inset-0" />
         <div className="md:flex">
-          <Sidebar />
+          {/* Sidebar + the Supabase-dependent controllers, code-split so
+              Offline Mode never loads them. Renders the sidebar in the same
+              DOM position as before (fragments emit no wrapper element). */}
+          <ShellGate />
           <main className="relative mx-auto min-h-dvh w-full max-w-md px-4 pb-[var(--tabbar-clearance)] pt-[calc(1.25rem+env(safe-area-inset-top))] md:max-w-3xl md:px-10 md:pb-16 md:pt-12 lg:max-w-4xl">
             {children}
           </main>

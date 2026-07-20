@@ -64,4 +64,20 @@ export interface OfflineSyncMetadata {
   last_sync_attempt_at: string | null;
   last_sync_success_at: string | null;
   sync_in_progress: boolean;
+  /**
+   * Auth user id of the account signed in on this device, or `null` when
+   * explicitly signed out. Written by the online app (which has the
+   * Supabase SDK loaded anyway); the offline screens read *only* this, so
+   * they never have to pull the ~256 kB auth SDK onto their critical path
+   * just to answer "who is this".
+   *
+   * Three distinct states matter, hence optional-and-nullable:
+   *   `string`    — signed in as this user.
+   *   `null`      — explicitly signed out; show nothing from the cache.
+   *   `undefined` — never recorded (a device that last ran a build from
+   *                 before this field existed). Falls back to the most
+   *                 recently cached identity, which is what those devices
+   *                 were already doing.
+   */
+  active_user_id?: string | null;
 }

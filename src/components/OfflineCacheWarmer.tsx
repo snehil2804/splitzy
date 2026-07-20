@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useSession } from "@/hooks/useSession";
 import { useTripData } from "@/hooks/useTripData";
 import { PAYMENT_SUGGESTIONS } from "@/lib/constants";
-import { saveReferenceData } from "@/lib/offlineDb";
+import { saveReferenceData, setActiveUserId } from "@/lib/offlineDb";
 import { syncPendingExpenses } from "@/lib/offlineSync";
 
 /**
@@ -17,9 +17,20 @@ import { syncPendingExpenses } from "@/lib/offlineSync";
  * `ServiceWorkerRegistrar`.
  */
 export function OfflineCacheWarmer() {
-  const { session } = useSession();
+  const { status: sessionStatus, session } = useSession();
   const { status, data } = useTripData();
   const lastSignature = useRef<string | null>(null);
+
+  // Record who's signed in so the offline screens can answer that question
+  // from IndexedDB alone, without loading the Supabase SDK. Kept separate
+  // from the reference-data effect below because it must not wait on trip
+  // data — the answer is known as soon as the session resolves.
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    setActiveUserId(session?.user.id ?? null).catch((err) => {
+      console.error("Failed to record the active user for offline mode:", err);
+    });
+  }, [sessionStatus, session]);
 
   useEffect(() => {
     const userId = session?.user.id;
