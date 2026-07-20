@@ -1,6 +1,22 @@
 # Project Status
 
-_Last updated: 2026-07-20 (Stage 3 — trip lifecycle, expense splits, balances & settlements — merged and live in production)_
+_Last updated: 2026-07-20 (Expense Details preview + creator-only edit permissions — merged and live in production)_
+
+## ✅ Expense Details preview + creator-only edit permissions — MERGED AND LIVE
+
+Clicking any expense opens a bottom-sheet preview (`?view=<id>`, correct browser back-nav) showing exactly what was saved: "Paid by" (trip-member payer) and "Logged by" (authenticated creator) always kept distinct, full split breakdown, payment app, location, trip name, and a collapsible technical section (lat/lng, expense ID, created/updated timestamps). See CHANGELOG "[Expense Details]" for the complete change list.
+
+**Permission model tightened per explicit user decision** (previously creator-or-owner for both edit and delete): **Edit = creator only**, never the trip owner, never a legacy row (`created_by IS NULL`, pre-dating Stage 3's creator tracking). **Delete = creator OR trip owner** — the owner's delete right is moderation/cleanup only and never implies edit access. A non-creator trip owner sees an explanatory note instead of an Edit button; ordinary members see neither Edit nor Delete. Enforced identically in the client (one shared `getExpensePermissions()` helper), the `edit_expense()` RPC body, and the pre-existing `expenses_update_owner_or_creator` RLS policy for delete — never just hidden buttons.
+
+**A real pre-existing gap found and fixed while wiring this in**: the expense list's Delete button was previously shown unconditionally, with no permission gate matching the server-side rule.
+
+**Verification before merge**: `npm test` 52/52 unit (was 43, +9 new permission-helper cases), `npm run test:trip-expense-engine` 42/42 live checks (updated for the new creator-only-edit rule, +2 new legacy-expense-specific checks), `npm run lint` clean, `npm run build` clean (21 routes, all static except the same 6 pre-existing dynamic routes), secret-key bundle grep clean. Live browser verification against production data (signed in as the real account): click-to-open sheet, Paid-by/Logged-by separation, full technical-details section, browser back-button closing the sheet, edit round-trip (form pre-fill → save → redirect back to the updated preview), and delete round-trip (confirmation sheet correctly stacks above the detail sheet, description+amount shown, sheet closes and list refreshes after deletion) — all confirmed working. Legacy-expense handling (a `created_by = null` row) confirmed live: "Logged by" shows an explanatory placeholder rather than being inferred from `paid_by`, only Delete is offered to the owner, with the legacy-specific note.
+
+**Merged and deployed (2026-07-20)**: committed directly to `main` (`5000bed`) with the user's explicit approval and auto-deployed by Vercel — production status check came back `success`. Post-deploy smoke test against `splitzy-delta.vercel.app`: `/` and `/expenses` both `307`→`/login` when signed out, matching expected auth-gated behavior.
+
+**Known pre-existing issue, unrelated to this feature** (not investigated further, out of scope): a hard page-load (full browser navigation, not client-side routing) directly to `/add` hangs indefinitely on the loading skeleton in local dev, with a console warning `The result of getServerSnapshot should be cached to avoid an infinite loop`. Client-side navigation to `/add` (via the in-app "+" button or an Edit action) works correctly. Worth a follow-up investigation into the `useSession`/`useTripData` `useSyncExternalStore` snapshot caching on that route.
+
+_Previous entry below._
 
 ## ✅ Stage 3: trip lifecycle, expense splits, balances & settlements — MERGED AND LIVE
 

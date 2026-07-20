@@ -1,5 +1,14 @@
 # Changelog
 
+## [Expense Details] — click-to-preview + creator-only edit permissions (`main` @ `5000bed`)
+
+Clicking any expense (whole card, keyboard-accessible) opens a bottom-sheet preview showing exactly what was saved, with "Paid by" (the trip-member payer) and "Logged by" (the authenticated creator) always shown as distinct sections — never conflated. Full split breakdown, payment app, location (name + formatted address, lat/lng only in a collapsible "Technical details" section alongside the expense ID and created/updated timestamps), and trip name. Query-param-driven (`?view=<id>`) so the browser back button closes it correctly.
+
+- Migration `20260721120000_expense_creator_only_edit` (additive, signature-unchanged so grants were untouched): tightens `edit_expense()`'s permission check from creator-or-owner to **creator-only** — closes the gap where the trip owner could modify another member's expense wording/amount, not just remove it
+- New permission model, one shared `getExpensePermissions()` helper (`src/lib/expensePermissions.ts`) used by the expense list, the detail sheet, and the Add/Edit page's edit guard: **Edit** = creator only, never the owner, never a legacy row. **Delete** = creator OR trip owner — the owner's delete right is moderation/cleanup only and never implies edit access. Legacy expenses (`created_by IS NULL`, predating Stage 3's creator tracking) can never be edited by anyone; only the trip owner may delete them. Enforced identically server-side: `edit_expense()`'s own check for edit, the existing `expenses_update_owner_or_creator` RLS policy (already creator-or-owner) for delete — never just hidden buttons. A non-creator trip owner sees a specific explanatory note ("you can remove it, but you didn't log it, so you can't edit its contents" for a known creator; a legacy-specific variant when `created_by` is null); ordinary members see neither button plus a generic note
+- Fixed a real pre-existing gap while wiring this in: the expense list's Delete button was previously always shown regardless of permission, with no server-side-matching gate
+- Tests: +9 unit (`tests/expensePermissions.test.ts`, all creator/owner/legacy/signed-out combinations) — 52/52 total; live suite `npm run test:trip-expense-engine` updated and extended for the new creator-only-edit rule plus two new legacy-expense-specific checks (owner can delete but not edit a `created_by = null` row) — 42/42
+
 ## [Stage 3] — trip lifecycle, expense splits, balances & settlements — merged & live (`main` @ `3d43c6e`)
 
 The financial engine: 4 expense split methods, creator-or-owner permissions, trip lifecycle management, optimized settlements, and an activity feed.
