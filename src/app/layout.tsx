@@ -26,6 +26,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // No pinch/double-tap zoom — this is a native-feeling PWA, not a document
+  // meant to be zoomed. Every tap target is already sized for touch.
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   // Mobile keyboards shrink the layout instead of overlaying the tab bar
   // on top of focused inputs.

@@ -20,9 +20,9 @@ export function TabBar() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-strong/95 backdrop-blur-xl md:hidden"
     >
-      <div className="glass flex items-center justify-between rounded-[1.75rem] px-3 py-2">
+      <div className="mx-auto flex max-w-md items-center justify-between px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
         {TABS.map(({ href, label, Icon, ...tab }) => {
           const active = pathname === href;
           if ("fab" in tab && tab.fab) {

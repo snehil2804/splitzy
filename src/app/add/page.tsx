@@ -18,7 +18,7 @@ import type { LocationInput, SplitType } from "@/lib/types";
 
 type SplitMode = "everyone" | "custom";
 
-const PAYMENT_SUGGESTIONS = ["Cash", "GPay", "PhonePe", "Paytm"];
+const PAYMENT_SUGGESTIONS = ["Cash", "GPay", "PhonePe", "Card"];
 
 /**
  * Manual Add/Edit Expense form. Calls `add_expense()`/`edit_expense()`,

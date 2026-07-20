@@ -4,10 +4,11 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  /* Single source of truth for how much room the fixed tab bar (plus its
-     floating button overhang and the iOS home-indicator inset) needs below
-     scrollable content. <main> pads by this; anchor scrolls respect it. */
-  --tabbar-clearance: calc(6.5rem + env(safe-area-inset-bottom));
+  /* Single source of truth for how much room the fixed, flush-to-edge tab
+     bar needs below scrollable content (the bar's own height plus a small
+     breathing gap) — the home-indicator inset is the bar's own padding, not
+     extra space here. <main> pads by this; anchor scrolls respect it. */
+  --tabbar-clearance: calc(5rem + env(safe-area-inset-bottom));
   --canvas: #f5f4fb;
   --surface: rgba(255, 255, 255, 0.66);
   --surface-strong: #ffffff;
