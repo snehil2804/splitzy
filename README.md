@@ -25,6 +25,7 @@ Single runtime dependency (`@supabase/supabase-js` + `@supabase/ssr`). Every pag
 - **Balances & settlements**: live "you owe / you're owed" balances, a minimum-transaction settlement suggestion, and a one-tap "mark as paid" action
 - **Trip lifecycle**: transfer ownership, leave a trip, permanently delete a trip (owner-only)
 - **Activity feed**: an immutable log of everything that happened on a trip
+- **Offline capture**: no signal on the mountain? Log expenses anyway — they queue on the device and sync themselves when the connection returns, with database-enforced idempotency so a retry can never duplicate an expense
 
 ## Quick start
 

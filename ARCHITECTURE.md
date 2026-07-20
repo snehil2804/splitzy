@@ -90,9 +90,19 @@ No state library. `src/hooks/useTripData.ts` is a ~120-line SWR-style store:
 
 `useSession.ts` mirrors the Supabase auth session the same way, for UI concerns only — `src/proxy.ts` is the actual access-control boundary, running before any of this ever renders. `useTheme.ts` follows the same pattern over `localStorage`, namespaced `splitzy:*`; theme is stamped on `<html data-theme>` by a blocking inline script in `layout.tsx` to avoid a flash of the wrong theme.
 
+## Offline expense capture
+
+Offline is a **separate, deliberately smaller mode**, not the live app running on stale data. When connectivity drops, `OfflineRedirector` moves the user to `/offline`; balances, settlements, activity, and invitations are simply not available there, because showing a cached figure as if it were current is worse than not showing it.
+
+- **Queue lives in IndexedDB** (`lib/offlineDb.ts`, via `idb`) — not `localStorage`: these are financial records that must survive volume, need indexed lookup by user and status, and must never be silently truncated. Three stores: `offline_expenses`, `offline_reference_data` (the trip/member snapshot the offline form needs), `offline_sync_metadata`.
+- **Multi-account safety is structural, not procedural.** There is no "list all queued expenses" export — the only listing function takes a `userId`. A second account on the same device therefore *cannot* be shown or sync the first account's queue, because the code to do so doesn't exist.
+- **Idempotency is enforced by the database, not the client.** Each queued record carries a key generated once at creation and preserved across edits; `add_expense()` returns the existing row for a `(creator, key)` pair rather than inserting again, backed by a partial unique index. Retrying a sync is therefore safe by construction — no client-side "don't double-submit" discipline required.
+- **Nothing is deleted locally until the server confirms it.** A failed sync — including one caused by expired auth — keeps the record with a human-readable error. One bad item never blocks the rest of the queue.
+- **The service worker's scope is narrow on purpose** (`public/sw.js`): same-origin GETs only, never `/api/*`, never cross-origin. It precaches the offline shell **and the JS chunks that shell needs to hydrate** — caching the HTML alone is useless, because these are client components whose server-rendered HTML is just a "Loading…" placeholder. Chunk URLs are scraped from the served HTML at install rather than hardcoded, so it survives every rebuild without a build step.
+
 ## Performance budget
 
-- **Dependencies:** `@supabase/supabase-js` + `@supabase/ssr` — no icon/animation/state libraries. Icons are hand-rolled inline SVGs, animations are pure CSS, the animated counter is ~30 lines of rAF.
+- **Dependencies:** `@supabase/supabase-js` + `@supabase/ssr` + `idb` (~1.2 kB, for the offline queue) — no icon/animation/state libraries. Icons are hand-rolled inline SVGs, animations are pure CSS, the animated counter is ~30 lines of rAF.
 - **Almost every route is static** — the three dynamic exceptions (`/api/expenses`, `/auth/callback`, `/join/[token]`) are thin server-only handlers, not pages with server-rendered content. One Google font (Geist, self-hosted by `next/font`), no images.
 - Skeletons (never spinners), `prefers-reduced-motion` respected globally.
 - **No N+1 queries**: `fetchTripData()` loads members, expenses (+ participants), and settlements for the selected trip in one `Promise.all`; balance/settlement computation reuses that single fetch rather than re-querying per member.
@@ -100,15 +110,26 @@ No state library. `src/hooks/useTripData.ts` is a ~120-line SWR-style store:
 ## Folder structure
 
 ```
+public/
+  sw.js           service worker — offline app shell only (see above)
 src/
   proxy.ts        Next 16's renamed Middleware — session refresh + route gate
   app/            routes: / (dashboard), /expenses, /balances, /settings,
                   /add (add + edit, via ?edit=<id>), /activity, /trips,
-                  /login, /profile, /invitations, /join/[token]
+                  /login, /profile, /invitations, /join/[token],
+                  /offline + /offline/add (Offline Mode)
                   + layout.tsx, globals.css, manifest.ts, icon.tsx, apple-icon.tsx
-                  api/expenses/route.ts, auth/callback/route.ts — server-only
-  components/     TabBar, ExpenseCard, SettlementList, ConfirmSheet, Avatar,
-                  SplitFields, AnimatedNumber, Skeleton, StateViews, icons
-  hooks/          useTripData, useSelectedTrip, useSession, useTheme
+                  api/expenses/route.ts, api/expenses/sync/route.ts,
+                  auth/callback/route.ts — server-only
+  components/     TabBar, Sidebar, ExpenseCard, ExpenseDetailSheet,
+                  SettlementList, ConfirmSheet, Avatar, SplitFields,
+                  AnimatedNumber, Skeleton, StateViews, LocationPicker, icons
+                  + ServiceWorkerRegistrar, OfflineRedirector,
+                    OfflineCacheWarmer, AutoSyncTrigger (render nothing —
+                    root-layout side effects)
+  hooks/          useTripData, useSelectedTrip, useSession, useTheme,
+                  useOnlineStatus, useOfflineQueue, useOfflineBootstrap,
+                  useOfflineGps, useAutoSync, useCurrentLocation
   lib/            data + domain layer (see above)
+                  + offlineDb, offlineSync, offlineTypes
 ```

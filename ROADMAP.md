@@ -16,6 +16,16 @@ Google OAuth + same-screen email code sign-in; membership-scoped, fully authenti
 
 4 expense split methods (equal, exact, percentage, shares) computed by one shared Postgres function; creator-or-owner expense edit/delete permissions; full trip lifecycle (transfer ownership, leave, permanent delete); settlement recording with a minimum-transaction algorithm; an immutable, trigger-driven activity feed.
 
+## Stage 4 — Premium Desktop UX ✅
+
+Responsive shell with a persistent desktop sidebar (the bottom tab bar became mobile-only), global keyboard focus rings, shared dialog accessibility (ESC, scroll-lock, focus trap/restore), desktop-centred modals, hover states throughout, and a flush native-feeling mobile nav with pinch-zoom disabled.
+
+## Offline Expense Queue ✅
+
+Capture expenses with no connectivity and sync them when it returns. Dedicated Offline Mode (never the live app on stale data), an IndexedDB queue scoped per authenticated user, a service-worker app shell that precaches its own JS so it actually hydrates offline, and a secure sync endpoint with database-enforced idempotency. Foreground sync only — Background Sync is deliberately unused, since it isn't dependable on iOS.
+
+**Possible follow-up**: evict the Supabase auth SDK (~256 kB) from the offline critical path. It's the largest remaining win for offline load speed, but it requires restructuring how the root layout loads on every route, so it was left as a deliberate decision rather than slipped in.
+
 ## Phase 3 — Apple Shortcut
 
 - iOS Shortcut triggered after a UPI payment (share sheet / automation)

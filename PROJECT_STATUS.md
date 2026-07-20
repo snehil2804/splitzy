@@ -1,6 +1,27 @@
 # Project Status
 
-_Last updated: 2026-07-21 (Stage 4 — premium desktop UX refinement — merged and live in production)_
+_Last updated: 2026-07-21 (Offline Expense Queue — merged and live in production)_
+
+## ✅ Offline Expense Queue — MERGED AND LIVE
+
+Record expenses with no signal (the mountain-trip case); they queue on the device and sync when the connection returns. Built on `feature/offline-expense-queue` across five checkpoints, reviewed on Vercel Previews throughout, and merged only after the user verified offline capture and sync on a physical device with WiFi and cellular both off. See CHANGELOG "[Offline Expense Queue]" for the full change list.
+
+**Architecture**: dedicated Offline Mode at `/offline` + `/offline/add` (never a degraded copy of the live app — balances, settlements, and activity are simply not shown offline rather than shown stale); IndexedDB via `idb` for the queue and cached trip/member reference data; a hand-rolled service worker for the app shell; and `POST /api/expenses/sync` wrapping the existing `add_expense()` RPC with a database-enforced idempotency key.
+
+**Migration** `20260721130000_offline_expense_idempotency` (additive, applied with explicit approval): `expenses.offline_idempotency_key` + a partial unique index scoped per-creator, and a trailing defaulted parameter on `add_expense()` that returns the existing row on replay. Online expense creation is provably unaffected — 42/42 of the pre-existing live engine suite re-passed unmodified.
+
+**Three real bugs found and fixed during rollout, all worth remembering:**
+1. *`CREATE OR REPLACE FUNCTION` does not replace a function whose signature changed.* Appending even a defaulted parameter makes Postgres create a **second overload**, and the new function object inherits the schema's default grants — which on this project include `anon`. Never an exploit (the function still checks `auth.uid()` internally) but wrong; fixed live and the migration now documents the drop-and-recreate-plus-regrant sequence.
+2. *Caching an offline route's HTML is not enough to make it work.* These are client components whose server-rendered HTML **is** the "Loading…" placeholder — verified directly against a production build. Without their JS chunks also cached there is nothing to hydrate with and no network to fetch from, so the page loads and sits on "Loading…" permanently. This is what the user hit on-device. The worker now scrapes and precaches those chunks at install.
+3. *`/offline` was auth-gated*, so it answered `307 → /login`, and `cache.put()` throws outright on a redirected response — meaning precaching failed **completely and silently** whenever the worker installed before sign-in. Now a public path, which costs nothing: it renders no server data, reads only per-user-scoped IndexedDB, and gates its own contents on identity.
+
+**Performance**: measured rather than guessed. `/offline` ships ~1 MB of uncompressed JS, of which ~256 kB is the Supabase auth SDK sitting on the critical path purely for a `getSession()` call that cannot succeed offline. Took the two zero-risk wins — collapsed identity + reference data from two sequential IndexedDB scans into one, and dropped the ~600 ms of entrance animation on the offline screens only. **Deliberately deferred**: evicting Supabase from the offline critical path, which would be the largest remaining win but requires restructuring how the root layout loads on every route.
+
+**Verification**: lint, typecheck, 74/74 unit tests, production build, and secret-key bundle scan clean; 102 live e2e checks green across six suites (18 db, 42 trip-expense-engine, 6 auth, 24 invitations, 6 offline-idempotency, 6 offline-conflicts); precache mechanism verified end-to-end against a running production build (17/17 files cacheable); and an on-device offline capture + sync pass by the user.
+
+**Known limitations**: Background Sync API is deliberately unused (foreground triggers only — it is not dependable on iOS/Safari); service worker cache-busting is a hardcoded version string rather than build-hash-driven, which is fine at this scope but would need revisiting if the shell grows.
+
+_Previous entry below._
 
 ## ✅ Stage 4: premium desktop UX refinement — MERGED AND LIVE
 
