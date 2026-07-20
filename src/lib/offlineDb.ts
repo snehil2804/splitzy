@@ -123,6 +123,21 @@ export async function getLatestReferenceDataForUser(
   return mine[0];
 }
 
+/**
+ * The `user_id` from whichever cached reference data was written most
+ * recently on this device — a network-free fallback for "who is signed in"
+ * when the live session hasn't resolved (see `useOfflineIdentity`). Never
+ * used to list or sync expense data itself; every read of that still goes
+ * through the userId-scoped functions above.
+ */
+export async function getMostRecentCachedUserId(): Promise<string | null> {
+  const db = await getDb();
+  const all = await db.getAll("offline_reference_data");
+  if (all.length === 0) return null;
+  all.sort((a, b) => b.cached_at.localeCompare(a.cached_at));
+  return all[0].user_id;
+}
+
 // ── Sync metadata ────────────────────────────────────────────────────────────
 
 const SYNC_METADATA_KEY = "global";

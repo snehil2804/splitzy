@@ -5,6 +5,7 @@ import {
   __resetForTests,
   deleteOfflineExpense,
   getLatestReferenceDataForUser,
+  getMostRecentCachedUserId,
   getOfflineExpense,
   getReferenceData,
   getSyncMetadata,
@@ -154,6 +155,31 @@ test("reference data round-trips and getLatestReferenceDataForUser picks the new
   assert.deepEqual(await getReferenceData("ref-newer"), newer);
   const latest = await getLatestReferenceDataForUser("ref-latest-user");
   assert.equal(latest?.trip_id, "ref-newer");
+});
+
+test("getMostRecentCachedUserId returns the user behind whichever cache entry is newest", async () => {
+  await __resetForTests();
+  await saveReferenceData(
+    referenceData({
+      trip_id: "recent-a",
+      user_id: "user-recent-a",
+      cached_at: new Date(Date.now() - 60_000).toISOString(),
+    }),
+  );
+  await saveReferenceData(
+    referenceData({
+      trip_id: "recent-b",
+      user_id: "user-recent-b",
+      cached_at: new Date().toISOString(),
+    }),
+  );
+
+  assert.equal(await getMostRecentCachedUserId(), "user-recent-b");
+});
+
+test("getMostRecentCachedUserId returns null when nothing has ever been cached", async () => {
+  await __resetForTests();
+  assert.equal(await getMostRecentCachedUserId(), null);
 });
 
 test("sync metadata defaults sensibly, then persists updates", async () => {

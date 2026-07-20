@@ -7,8 +7,8 @@ import { Avatar } from "@/components/Avatar";
 import { ChevronRightIcon, CheckIcon, CrosshairIcon } from "@/components/icons";
 import { EmptyState } from "@/components/StateViews";
 import { useOfflineGps } from "@/hooks/useOfflineGps";
+import { useOfflineIdentity } from "@/hooks/useOfflineIdentity";
 import { refreshOfflineQueue } from "@/hooks/useOfflineQueue";
-import { useSession } from "@/hooks/useSession";
 import { formatINR } from "@/lib/format";
 import { getLatestReferenceDataForUser, getOfflineExpense, saveOfflineExpense } from "@/lib/offlineDb";
 import type { OfflineExpense, OfflineReferenceData } from "@/lib/offlineTypes";
@@ -33,8 +33,7 @@ function OfflineAddExpenseFlow() {
   const searchParams = useSearchParams();
   const editLocalId = searchParams.get("edit");
   const isEditing = editLocalId !== null;
-  const { status: sessionStatus, session } = useSession();
-  const userId = session?.user.id ?? null;
+  const { status: identityStatus, userId } = useOfflineIdentity();
 
   const [reference, setReference] = useState<OfflineReferenceData | null | undefined>(undefined);
   const [editingExpense, setEditingExpense] = useState<OfflineExpense | null | undefined>(
@@ -70,6 +69,10 @@ function OfflineAddExpenseFlow() {
 
   useEffect(() => {
     if (!editLocalId) return;
+    // Wait for identity to resolve (it can arrive late via the offline
+    // fallback path) rather than checking ownership against a still-null
+    // userId — that would incorrectly reject a valid edit as "not found."
+    if (!userId) return;
     let cancelled = false;
     getOfflineExpense(editLocalId).then((existing) => {
       if (cancelled) return;
@@ -91,10 +94,10 @@ function OfflineAddExpenseFlow() {
     return () => {
       cancelled = true;
     };
-    // userId intentionally omitted: this hydration should only ever run
-    // once per editLocalId, not re-run if the session object identity changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editLocalId]);
+    // userId's *value* is stable for a signed-in user across token
+    // refreshes, so re-running only when it actually changes (null → an
+    // id) is exactly the desired behavior, not a source of clobbering.
+  }, [editLocalId, userId]);
 
   // Default payer = the signed-in member, unless overridden by a tap or
   // edit-mode hydration — derived, never imperatively pushed via an effect.
@@ -197,7 +200,7 @@ function OfflineAddExpenseFlow() {
     }
   }
 
-  if (sessionStatus === "loading" || (isEditing && editingExpense === undefined) || reference === undefined) {
+  if (identityStatus === "loading" || (isEditing && editingExpense === undefined) || reference === undefined) {
     return (
       <FormShell isEditing={isEditing}>
         <Loading />
@@ -205,7 +208,7 @@ function OfflineAddExpenseFlow() {
     );
   }
 
-  if (sessionStatus === "unauthenticated" || !userId) {
+  if (identityStatus === "signed-out" || !userId) {
     return (
       <FormShell isEditing={isEditing}>
         <EmptyState

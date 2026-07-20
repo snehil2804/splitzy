@@ -5,9 +5,9 @@ import { useEffect, useState } from "react";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from "@/components/icons";
 import { EmptyState } from "@/components/StateViews";
+import { useOfflineIdentity } from "@/hooks/useOfflineIdentity";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { useSession } from "@/hooks/useSession";
 import { expenseEmoji } from "@/lib/emoji";
 import { formatFullDateTime, formatINR } from "@/lib/format";
 import { getLatestReferenceDataForUser, hasQueuedExpensesForOtherUser } from "@/lib/offlineDb";
@@ -27,9 +27,8 @@ const STATUS_LABEL: Record<OfflineExpense["sync_status"], string> = {
  * everything from IndexedDB (`offlineDb.ts`); never fetches live data.
  */
 export default function OfflinePage() {
-  const { status: sessionStatus, session } = useSession();
+  const { status: identityStatus, userId, usingCachedIdentity } = useOfflineIdentity();
   const online = useOnlineStatus();
-  const userId = session?.user.id ?? null;
   const { status: queueStatus, expenses, pendingCount, failedCount, removeExpense } = useOfflineQueue(userId);
 
   // `undefined` = still checking IndexedDB; `null` = checked, nothing cached.
@@ -91,7 +90,7 @@ export default function OfflinePage() {
     }
   }
 
-  if (sessionStatus === "loading" || (userId && reference === undefined)) {
+  if (identityStatus === "loading" || (userId && reference === undefined)) {
     return (
       <div className="space-y-6">
         <Header />
@@ -102,7 +101,7 @@ export default function OfflinePage() {
     );
   }
 
-  if (sessionStatus === "unauthenticated" || !userId) {
+  if (identityStatus === "signed-out" || !userId) {
     return (
       <div className="space-y-6">
         <Header />
@@ -251,6 +250,7 @@ export default function OfflinePage() {
       <p className="text-center text-xs text-ink-faint">
         Trip and member information last updated on{" "}
         {formatFullDateTime(new Date(reference.cached_at))}.
+        {usingCachedIdentity && " Sign-in couldn't be freshly confirmed — using your last known identity on this device."}
       </p>
 
       {pendingCount > 0 && (
