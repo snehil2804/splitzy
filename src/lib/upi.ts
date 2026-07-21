@@ -114,6 +114,22 @@ export const UPI_APP_LABELS: Record<Exclude<UpiAppId, "generic">, string> = {
 };
 
 /**
+ * Bare "just launch the app" schemes, carrying no payment details at all.
+ *
+ * For apps that decline externally-initiated payments to a personal VPA
+ * (confirmed on-device for Google Pay: it resolves the payee, takes the
+ * UPI PIN, then fails at the switch with a bogus "limit exceeded"), sending
+ * payment parameters is worse than useless — it walks the user all the way
+ * to a PIN prompt before failing. Opening the app cold, after they've
+ * copied the UPI ID, is the path that actually completes.
+ */
+export const UPI_APP_OPEN_URIS: Record<"gpay" | "phonepe" | "paytm", string> = {
+  gpay: "gpay://",
+  phonepe: "phonepe://",
+  paytm: "paytmmp://",
+};
+
+/**
  * Builds a UPI payment deep link for the given app (default: the universal
  * scheme). Every value is taken only from the fields on this object and run
  * through `encodeURIComponent` — there is no merge/override path, so a
