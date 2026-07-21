@@ -157,12 +157,15 @@ export default function SettingsPage() {
       >
         <h2 className="text-sm font-semibold">About</h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          Splitzy keeps trip money simple. Soon, an Apple Shortcut will log
-          expenses automatically right after you pay via UPI — no typing at
-          all.
+          Splitzy keeps trip money simple — track who paid, see who owes what,
+          and settle up over UPI. Soon, an Apple Shortcut will log expenses
+          automatically right after you pay — no typing at all.
         </p>
         <p className="mt-3 text-xs text-ink-faint">
-          Splitzy v0.2 · Build {BUILD_ID} · Made with 💜
+          Splitzy v0.2 · Build {BUILD_ID}
+        </p>
+        <p className="mt-1 text-xs text-ink-faint">
+          Designed &amp; developed by Snehil Rai 💜
         </p>
       </section>
     </div>

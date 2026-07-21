@@ -119,28 +119,22 @@ export function SettlementList({
               }}
               className="tap flex flex-col gap-2 p-3.5 transition-colors hover:bg-line"
             >
-              {/* Row 1: who → who, ending in the expand chevron. Names
-                  truncate rather than wrap so they never collide with the
-                  amount below — the full name is always available via the
-                  hover tooltip and the "why" panel this row expands into. */}
-              <div className="flex min-w-0 items-center gap-2">
-                <Avatar name={s.from.name} size="sm" />
-                <span
-                  className="min-w-0 truncate text-sm font-medium"
-                  title={s.from.name}
-                >
+              {/* Row 1: who → who, ending in the expand chevron. Avatars are
+                  stacked (the existing AvatarStack pattern) to free up width,
+                  and the names sit in one wrapping paragraph — so even long
+                  names are always shown in full rather than truncated. */}
+              <div className="flex min-w-0 items-start gap-2.5">
+                <span className="flex shrink-0 -space-x-1.5">
+                  <Avatar name={s.from.name} size="sm" />
+                  <Avatar name={s.to.name} size="sm" />
+                </span>
+                <p className="min-w-0 flex-1 text-sm font-medium leading-snug">
                   {isYou(s.from.name) ? "You" : s.from.name}
-                </span>
-                <ArrowRightIcon className="size-4 shrink-0 text-ink-faint" />
-                <Avatar name={s.to.name} size="sm" />
-                <span
-                  className="min-w-0 truncate text-sm font-medium"
-                  title={s.to.name}
-                >
+                  <ArrowRightIcon className="mx-1.5 inline size-3.5 shrink-0 align-[-1px] text-ink-faint" />
                   {isYou(s.to.name) ? "you" : s.to.name}
-                </span>
+                </p>
                 <ChevronRightIcon
-                  className={`ml-auto size-3.5 shrink-0 text-ink-faint transition-transform ${expanded ? "rotate-90" : ""}`}
+                  className={`mt-1 size-3.5 shrink-0 text-ink-faint transition-transform ${expanded ? "rotate-90" : ""}`}
                 />
               </div>
 
