@@ -6,7 +6,11 @@
  * a fast error message, never the actual security boundary.
  */
 
-const UPI_ID_PATTERN = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
+// Bound kept comfortably under PostgreSQL's regex engine limit (255) on
+// {n,m} repetition counts — the matching server-side CHECK constraint threw
+// "invalid regular expression: invalid repetition count(s)" at {2,256}.
+// Real UPI handles are nowhere near even this length; 100 is generous.
+const UPI_ID_PATTERN = /^[a-zA-Z0-9.\-_]{2,100}@[a-zA-Z]{2,64}$/;
 
 export interface UpiIdValidationResult {
   valid: boolean;
