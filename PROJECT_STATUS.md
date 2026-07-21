@@ -1,6 +1,10 @@
 # Project Status
 
-_Last updated: 2026-07-21 (production database reset from test data to a clean slate)_
+_Last updated: 2026-07-21 (feature/settlement-upi-payments — build complete, awaiting Preview approval)_
+
+## 🔍 Settlement UPI payments (branch `feature/settlement-upi-payments`, NOT merged)
+
+Fixes the settlement-row mobile layout and adds a "Pay via UPI" flow — see CHANGELOG "[Settlement UPI payments]" for the full change list. Migration `20260722000000_member_upi_id.sql` (additive: `members.upi_id`, format CHECK, column-scoped self-service grant + RLS policy mirroring `profiles.display_name`) already applied to production per the approved plan. Settlement math/`record_settlement()`/balance calculations untouched. Verification so far: `lint`/`tsc --noEmit`/88-88 unit tests (was 74, +14 new UPI cases)/production build all clean; offline-bundle regression check re-run (`/offline` still 730 KB/12 assets, `GoTrueClient` still absent). Vercel Preview build succeeded: `https://splitzy-dcs15fz8o-snehils-projects-979efd30.vercel.app` (sits behind Vercel's own account-level deployment-protection SSO wall — opens normally in a browser already signed into Vercel; not reachable via a bare `curl`). **Awaiting the user's Preview review and explicit approval before merge — do not merge to `main` until then.**
 
 ## ✅ Production data reset — DONE
 
