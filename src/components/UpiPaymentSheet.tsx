@@ -9,7 +9,21 @@ import type { Settlement } from "@/lib/types";
 import { buildUpiPaymentUri, maskUpiId, UPI_APP_LABELS, type UpiAppId } from "@/lib/upi";
 import { CheckIcon, CopyIcon, WalletIcon, XIcon } from "./icons";
 
-const TRY_APPS: Exclude<UpiAppId, "generic">[] = ["gpay", "phonepe", "paytm", "cred"];
+/**
+ * CRED first because it is the one app confirmed on a real device to carry
+ * an externally-initiated payment all the way through to success.
+ *
+ * The others are offered but genuinely may not complete: Google Pay in
+ * particular resolves the payee (name and photo), accepts the UPI PIN, and
+ * *then* declines at the switch with a misleading "you have exceeded your
+ * payment limit" — even for ₹1, and even though paying the same person from
+ * inside Google Pay works. That is Google Pay's own policy on payments
+ * initiated from outside a UPI app to a personal VPA; the payload is
+ * identical to the one CRED accepts, so there is nothing to fix on our
+ * side. Hence the copy below, and why Copy UPI ID / Copy amount stay
+ * first-class rather than being treated as a fallback.
+ */
+const TRY_APPS: Exclude<UpiAppId, "generic">[] = ["cred", "gpay", "phonepe", "paytm"];
 
 interface UpiPaymentSheetProps {
   settlement: Settlement;
@@ -206,7 +220,7 @@ export function UpiPaymentSheet({
                   {online && Object.keys(appUris).length > 0 && (
                     <div>
                       <p className="mb-2 text-center text-xs text-ink-faint">
-                        Or try a specific app directly:
+                        Or open a specific app:
                       </p>
                       <div className="flex flex-wrap justify-center gap-2">
                         {TRY_APPS.filter((app) => appUris[app]).map((app) => (
@@ -214,15 +228,23 @@ export function UpiPaymentSheet({
                             key={app}
                             href={appUris[app]}
                             onClick={() => setPhase("confirm")}
-                            className="tap rounded-full bg-line/60 px-3.5 py-2 text-xs font-semibold transition-colors hover:bg-line"
+                            className={`tap rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
+                              app === "cred"
+                                ? "bg-brand-soft text-brand hover:bg-brand/20"
+                                : "bg-line/60 hover:bg-line"
+                            }`}
                           >
                             {UPI_APP_LABELS[app]}
+                            {app === "cred" && " ✓"}
                           </a>
                         ))}
                       </div>
-                      <p className="mt-2 text-center text-[11px] leading-relaxed text-ink-faint">
-                        Best-effort — not every device will have every app installed, and these
-                        aren&apos;t guaranteed to work like the button above.
+                      <p className="mt-2.5 text-center text-[11px] leading-relaxed text-ink-faint">
+                        Some apps refuse payments started from outside their own app — Google Pay
+                        may ask for your PIN and then fail with a &quot;limit&quot; message even for
+                        small amounts. That&apos;s their restriction, not a problem with the
+                        amount or the UPI ID. If it happens, copy the details below and pay
+                        inside the app.
                       </p>
                     </div>
                   )}

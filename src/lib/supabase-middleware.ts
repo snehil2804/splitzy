@@ -20,10 +20,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * offline this proxy never runs anyway, so gating it was never the thing
  * protecting anything.
  */
-// `/upi-debug` is a TEMPORARY preview-only diagnostic page (see its own
-// comment); it renders no server data and stores nothing. Remove both it
-// and this entry before merging.
-const PUBLIC_PATHS = ["/login", "/auth", "/api", "/join", "/offline", "/upi-debug"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api", "/join", "/offline"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
