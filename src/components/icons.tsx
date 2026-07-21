@@ -247,6 +247,25 @@ export function ShareIcon(props: IconProps) {
   );
 }
 
+export function CopyIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="8.5" y="8.5" width="11" height="11" rx="2" />
+      <path d="M15.5 8.5V6.3A1.8 1.8 0 0 0 13.7 4.5H6.3A1.8 1.8 0 0 0 4.5 6.3v7.4a1.8 1.8 0 0 0 1.8 1.8h2.2" />
+    </Icon>
+  );
+}
+
+export function WalletIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="6" width="17" height="13" rx="2.2" />
+      <path d="M3.5 10h17" />
+      <circle cx="16.2" cy="14" r="1.1" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
 export function ActivityIcon(props: IconProps) {
   return (
     <Icon {...props}>

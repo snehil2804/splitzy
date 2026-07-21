@@ -9,9 +9,10 @@ import { SetupNotice } from "@/components/StateViews";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 import { signOut, useSession } from "@/hooks/useSession";
 import { useTripData } from "@/hooks/useTripData";
-import { fetchMyProfile, updateDisplayName } from "@/lib/queries";
+import { fetchMyProfile, fetchMyUpiId, updateDisplayName, updateMyUpiId } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import type { Profile } from "@/lib/types";
+import { validateUpiId } from "@/lib/upi";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -26,6 +27,9 @@ export default function ProfilePage() {
   const [signingOut, setSigningOut] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [upiId, setUpiId] = useState("");
+  const [savingUpi, setSavingUpi] = useState(false);
+  const [upiMessage, setUpiMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (sessionStatus !== "authenticated") return;
@@ -36,6 +40,9 @@ export default function ProfilePage() {
       })
       .catch(() => setProfile(null))
       .finally(() => setProfileLoaded(true));
+    fetchMyUpiId()
+      .then((id) => setUpiId(id ?? ""))
+      .catch(() => {});
   }, [sessionStatus]);
 
   async function handleSave(e: FormEvent) {
@@ -49,6 +56,26 @@ export default function ProfilePage() {
       setMessage(err instanceof Error ? err.message : "Couldn't save that.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveUpi(e: FormEvent) {
+    e.preventDefault();
+    const result = validateUpiId(upiId);
+    if (!result.valid) {
+      setUpiMessage(result.error ?? "That doesn't look like a valid UPI ID.");
+      return;
+    }
+    setSavingUpi(true);
+    setUpiMessage(null);
+    try {
+      await updateMyUpiId(result.normalized || null);
+      setUpiId(result.normalized);
+      setUpiMessage(result.normalized ? "Saved." : "Removed.");
+    } catch (err) {
+      setUpiMessage(err instanceof Error ? err.message : "Couldn't save that.");
+    } finally {
+      setSavingUpi(false);
     }
   }
 
@@ -142,7 +169,44 @@ export default function ProfilePage() {
 
           <section
             className="anim-fade-up glass rounded-3xl p-5"
-            style={{ animationDelay: "120ms" }}
+            style={{ animationDelay: "90ms" }}
+          >
+            <h2 className="text-sm font-semibold">UPI ID</h2>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              Lets other trip members pay you directly from a settlement suggestion.
+            </p>
+            <form onSubmit={handleSaveUpi} className="mt-3 flex gap-2">
+              <input
+                type="text"
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                placeholder="yourname@bank"
+                maxLength={256}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="min-h-12 w-full rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none transition-colors focus:border-brand"
+              />
+              <button
+                type="submit"
+                disabled={savingUpi}
+                className="tap shrink-0 rounded-2xl bg-brand px-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl disabled:opacity-60"
+              >
+                {savingUpi ? "…" : "Save"}
+              </button>
+            </form>
+            {upiMessage && (
+              <p className="anim-fade-in mt-2 text-xs font-medium text-ink-muted">{upiMessage}</p>
+            )}
+            <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+              Saving a UPI ID does not prove bank ownership — Splitzy can&apos;t verify it belongs
+              to you. Only add your own, and clear it any time by saving an empty field.
+            </p>
+          </section>
+
+          <section
+            className="anim-fade-up glass rounded-3xl p-5"
+            style={{ animationDelay: "150ms" }}
           >
             <h2 className="text-sm font-semibold">Account</h2>
             <button

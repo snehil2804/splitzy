@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatINR } from "@/lib/format";
 import type { MemberBalance, Settlement } from "@/lib/types";
 import { Avatar } from "./Avatar";
-import { ArrowRightIcon, CheckIcon, ChevronRightIcon } from "./icons";
+import { ArrowRightIcon, CheckIcon, ChevronRightIcon, WalletIcon } from "./icons";
 
 interface SettlementListProps {
   settlements: Settlement[];
@@ -21,6 +21,12 @@ interface SettlementListProps {
   onSettle?: (s: Settlement) => void;
   /** `${from.id}-${to.id}` of the settlement currently being recorded, if any. */
   settlingKey?: string | null;
+  /**
+   * When provided, a "Pay" action appears on rows where the signed-in user
+   * is the payer and the recipient has a UPI ID on file — opens the UPI
+   * payment sheet. Never shown for rows the current user isn't paying.
+   */
+  onPay?: (s: Settlement) => void;
 }
 
 /**
@@ -71,6 +77,7 @@ export function SettlementList({
   balances,
   onSettle,
   settlingKey,
+  onPay,
 }: SettlementListProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
@@ -94,6 +101,9 @@ export function SettlementList({
         const key = `${s.from.id}-${s.to.id}`;
         const settling = settlingKey === key;
         const expanded = expandedKey === key;
+        const iAmPaying = isYou(s.from.name);
+        const canPayViaUpi = iAmPaying && Boolean(onPay) && Boolean(s.to.upiId);
+        const missingRecipientUpi = iAmPaying && Boolean(onPay) && !s.to.upiId;
         return (
           <li key={key} className="overflow-hidden rounded-2xl bg-line/60">
             <div
@@ -107,39 +117,75 @@ export function SettlementList({
                   setExpandedKey(expanded ? null : key);
                 }
               }}
-              className="tap flex items-center gap-3 p-3.5 transition-colors hover:bg-line"
+              className="tap flex flex-col gap-2 p-3.5 transition-colors hover:bg-line"
             >
-              <Avatar name={s.from.name} size="sm" />
-              <ArrowRightIcon className="size-4 shrink-0 text-ink-faint" />
-              <Avatar name={s.to.name} size="sm" />
-              <p className="min-w-0 flex-1 text-sm leading-snug">
-                <span className="font-medium">
+              {/* Row 1: who → who, ending in the expand chevron. Names
+                  truncate rather than wrap so they never collide with the
+                  amount below — the full name is always available via the
+                  hover tooltip and the "why" panel this row expands into. */}
+              <div className="flex min-w-0 items-center gap-2">
+                <Avatar name={s.from.name} size="sm" />
+                <span
+                  className="min-w-0 truncate text-sm font-medium"
+                  title={s.from.name}
+                >
                   {isYou(s.from.name) ? "You" : s.from.name}
-                </span>{" "}
-                {isYou(s.from.name) ? "pay" : "pays"}{" "}
-                <span className="font-medium">
+                </span>
+                <ArrowRightIcon className="size-4 shrink-0 text-ink-faint" />
+                <Avatar name={s.to.name} size="sm" />
+                <span
+                  className="min-w-0 truncate text-sm font-medium"
+                  title={s.to.name}
+                >
                   {isYou(s.to.name) ? "you" : s.to.name}
                 </span>
-              </p>
-              <span className="shrink-0 text-sm font-semibold tabular-nums">
-                {formatINR(s.amount)}
-              </span>
-              <ChevronRightIcon
-                className={`size-3.5 shrink-0 text-ink-faint transition-transform ${expanded ? "rotate-90" : ""}`}
-              />
-              {onSettle && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSettle(s);
-                  }}
-                  disabled={settling}
-                  aria-label={`Mark ${s.from.name} → ${s.to.name} as paid`}
-                  className="tap grid size-8 shrink-0 place-items-center rounded-full bg-positive/10 text-positive transition-colors hover:bg-positive/20 disabled:opacity-50"
-                >
-                  <CheckIcon className="size-4" strokeWidth={2.4} />
-                </button>
+                <ChevronRightIcon
+                  className={`ml-auto size-3.5 shrink-0 text-ink-faint transition-transform ${expanded ? "rotate-90" : ""}`}
+                />
+              </div>
+
+              {/* Row 2: amount pinned left, actions pinned right —
+                  `justify-between` keeps a floor of space between them at
+                  every width, so neither can ever overlap the other. */}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-lg font-semibold tabular-nums">
+                  {formatINR(s.amount)}
+                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {canPayViaUpi && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPay?.(s);
+                      }}
+                      className="tap flex h-11 items-center gap-1.5 rounded-full bg-brand px-4 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow hover:shadow-xl"
+                    >
+                      <WalletIcon className="size-4" />
+                      Pay
+                    </button>
+                  )}
+                  {onSettle && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSettle(s);
+                      }}
+                      disabled={settling}
+                      aria-label={`Mark ${s.from.name} → ${s.to.name} as paid`}
+                      className="tap grid size-11 shrink-0 place-items-center rounded-full bg-positive/10 text-positive transition-colors hover:bg-positive/20 disabled:opacity-50"
+                    >
+                      <CheckIcon className="size-4" strokeWidth={2.4} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {missingRecipientUpi && (
+                <p className="text-xs text-ink-faint">
+                  Ask {s.to.name} to add a UPI ID in Settings to pay them in-app.
+                </p>
               )}
             </div>
             {expanded && (
