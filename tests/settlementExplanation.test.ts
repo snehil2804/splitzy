@@ -3,10 +3,10 @@ import { test } from "node:test";
 import { explainSettlement } from "../src/components/SettlementList";
 import type { Member, MemberBalance, Settlement } from "../src/lib/types";
 
-const snehil: Member = { id: "m1", name: "Snehil", userId: "u1", role: "owner" };
-const shruti: Member = { id: "m2", name: "Shruti", userId: null, role: "member" };
-const anshul: Member = { id: "m3", name: "Anshul", userId: null, role: "member" };
-const snehiltest: Member = { id: "m4", name: "Snehiltest", userId: "u4", role: "member" };
+const snehil: Member = { id: "m1", name: "Snehil", userId: "u1", role: "owner", upiId: null };
+const shruti: Member = { id: "m2", name: "Shruti", userId: null, role: "member", upiId: null };
+const anshul: Member = { id: "m3", name: "Anshul", userId: null, role: "member", upiId: null };
+const snehiltest: Member = { id: "m4", name: "Snehiltest", userId: "u4", role: "member", upiId: null };
 
 // Mirrors the real Dharamshala trip's computeSettlements() output.
 const settlements: Settlement[] = [
@@ -57,10 +57,10 @@ test("without balances, the headline falls back to summing the rounded settlemen
 });
 
 test("three-way split debt labels the middle piece as 'Another'", () => {
-  const debtor: Member = { id: "m5", name: "Debtor", userId: null, role: "member" };
-  const a: Member = { id: "m6", name: "A", userId: null, role: "member" };
-  const b: Member = { id: "m7", name: "B", userId: null, role: "member" };
-  const c: Member = { id: "m8", name: "C", userId: null, role: "member" };
+  const debtor: Member = { id: "m5", name: "Debtor", userId: null, role: "member", upiId: null };
+  const a: Member = { id: "m6", name: "A", userId: null, role: "member", upiId: null };
+  const b: Member = { id: "m7", name: "B", userId: null, role: "member", upiId: null };
+  const c: Member = { id: "m8", name: "C", userId: null, role: "member", upiId: null };
   const threeWay: Settlement[] = [
     { from: debtor, to: a, amount: 100 },
     { from: debtor, to: b, amount: 50 },
