@@ -17,10 +17,27 @@ import { useState } from "react";
  * Nothing here is stored or sent anywhere — every link is built in the
  * browser from what you type.
  */
+/**
+ * Scheme prefixes to test against. "generic" is the universal NPCI scheme;
+ * on iOS it opens whichever app the system arbitrarily picks (Apple's docs:
+ * when several apps register one scheme, "the app chosen by the system is
+ * undefined"), which is why a specific app must be selectable here for the
+ * results to mean anything.
+ */
+const APPS = [
+  { id: "gpay", label: "Google Pay", prefix: "gpay://upi/pay" },
+  { id: "phonepe", label: "PhonePe", prefix: "phonepe://pay" },
+  { id: "paytm", label: "Paytm", prefix: "paytmmp://pay" },
+  { id: "cred", label: "CRED", prefix: "credpay://upi/pay" },
+  { id: "generic", label: "Any (generic)", prefix: "upi://pay" },
+] as const;
+
 export default function UpiDebugPage() {
   const [upiId, setUpiId] = useState("");
   const [amount, setAmount] = useState("1.00");
+  const [appId, setAppId] = useState<(typeof APPS)[number]["id"]>("gpay");
 
+  const prefix = APPS.find((a) => a.id === appId)!.prefix;
   const pa = encodeURIComponent(upiId.trim());
   const am = encodeURIComponent(amount.trim());
 
@@ -29,27 +46,27 @@ export default function UpiDebugPage() {
         {
           label: "A · Full payload (what Splitzy sends now)",
           hint: "pa + pn + am + cu + tn",
-          uri: `upi://pay?pa=${pa}&pn=Test%20Payee&am=${am}&cu=INR&tn=Splitzy%20test`,
+          uri: `${prefix}?pa=${pa}&pn=Test%20Payee&am=${am}&cu=INR&tn=Splitzy%20test`,
         },
         {
           label: "B · No note",
           hint: "pa + pn + am + cu",
-          uri: `upi://pay?pa=${pa}&pn=Test%20Payee&am=${am}&cu=INR`,
+          uri: `${prefix}?pa=${pa}&pn=Test%20Payee&am=${am}&cu=INR`,
         },
         {
           label: "C · No payee name",
           hint: "pa + am + cu",
-          uri: `upi://pay?pa=${pa}&am=${am}&cu=INR`,
+          uri: `${prefix}?pa=${pa}&am=${am}&cu=INR`,
         },
         {
           label: "D · No amount (you type it in the app)",
           hint: "pa + pn — the key test",
-          uri: `upi://pay?pa=${pa}&pn=Test%20Payee`,
+          uri: `${prefix}?pa=${pa}&pn=Test%20Payee`,
         },
         {
           label: "E · Payee only, barest possible link",
           hint: "pa",
-          uri: `upi://pay?pa=${pa}`,
+          uri: `${prefix}?pa=${pa}`,
         },
       ]
     : [];
@@ -88,6 +105,30 @@ export default function UpiDebugPage() {
             className="mt-2 min-h-12 w-full rounded-2xl border-2 border-transparent bg-line/60 px-4 py-3 text-sm outline-none focus:border-brand"
           />
         </label>
+        <div>
+          <p className="text-sm font-semibold">Open in</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {APPS.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setAppId(a.id)}
+                aria-pressed={appId === a.id}
+                className={`tap min-h-11 rounded-full px-4 text-xs font-semibold transition-colors ${
+                  appId === a.id
+                    ? "bg-brand text-white"
+                    : "bg-line/60 text-ink-muted hover:bg-line"
+                }`}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-ink-faint">
+            Pick a specific app — &quot;Any&quot; lets iOS choose, which is what keeps landing on
+            WhatsApp.
+          </p>
+        </div>
         <p className="text-xs text-ink-faint">
           Use ₹1 and a real payee. Nothing is saved or sent — links are built in your browser.
         </p>
