@@ -7,8 +7,7 @@ test("default (no app argument) still produces the universal upi://pay scheme, u
     recipientUpiId: "snehil@ybl",
     recipientName: "Snehil",
     amount: 100,
-    tripName: "Trip",
-    reference: "ref-generic",
+    tripName: "Trip"
   });
   assert.match(uri, /^upi:\/\/pay\?/);
 });
@@ -18,8 +17,7 @@ test("each app-specific scheme carries the exact same params as the generic one,
     recipientUpiId: "snehil@ybl",
     recipientName: "Snehil",
     amount: 3167,
-    tripName: "Dharamshala",
-    reference: "ref-apps",
+    tripName: "Dharamshala"
   };
   const generic = buildUpiPaymentUri(input, "generic");
   const genericQuery = generic.split("?")[1];
@@ -40,13 +38,13 @@ test("an invalid recipient or non-positive amount is rejected the same way regar
   for (const app of ["generic", "gpay", "phonepe", "paytm", "cred"] as const) {
     assert.throws(() =>
       buildUpiPaymentUri(
-        { recipientUpiId: "not-valid", recipientName: "X", amount: 10, tripName: "T", reference: "r" },
+        { recipientUpiId: "not-valid", recipientName: "X", amount: 10, tripName: "T", },
         app,
       ),
     );
     assert.throws(() =>
       buildUpiPaymentUri(
-        { recipientUpiId: "x@ybl", recipientName: "X", amount: 0, tripName: "T", reference: "r" },
+        { recipientUpiId: "x@ybl", recipientName: "X", amount: 0, tripName: "T", },
         app,
       ),
     );
@@ -90,8 +88,7 @@ test("correct amount is encoded into the UPI URI with exactly two decimal places
     recipientUpiId: "snehil@ybl",
     recipientName: "Snehil",
     amount: 3167,
-    tripName: "Dharamshala",
-    reference: "ref-1",
+    tripName: "Dharamshala"
   });
   assert.match(uri, /[?&]am=3167\.00(&|$)/);
 });
@@ -101,33 +98,79 @@ test("a fractional amount is preserved exactly, not rounded away", () => {
     recipientUpiId: "snehil@ybl",
     recipientName: "Snehil",
     amount: 429.5,
-    tripName: "Dharamshala",
-    reference: "ref-2",
+    tripName: "Dharamshala"
   });
   assert.match(uri, /[?&]am=429\.50(&|$)/);
 });
 
-test("recipient UPI ID and name are safely percent-encoded, never left to inject query syntax", () => {
+test("query-breaking characters in the payee name are stripped, never left to inject query syntax", () => {
   const uri = buildUpiPaymentUri({
     recipientUpiId: "snehil@ybl",
     recipientName: "Snehil & Co / Rai",
     amount: 100,
     tripName: "Trip",
-    reference: "ref-3",
   });
-  assert.match(uri, /pn=Snehil%20%26%20Co%20%2F%20Rai/);
+  assert.ok(!uri.includes("&Co"));
   assert.ok(!uri.includes("Snehil & Co"));
+  assert.match(uri, /pn=Snehil%20Co%20Rai/);
 });
 
-test("the payment note is URL-encoded and includes the trip name", () => {
+test("the payment note is plain ASCII and includes the trip name", () => {
   const uri = buildUpiPaymentUri({
     recipientUpiId: "snehil@ybl",
     recipientName: "Snehil",
     amount: 100,
     tripName: "Goa Trip 2026",
-    reference: "ref-4",
   });
-  assert.match(uri, /tn=Splitzy%20%C2%B7%20Goa%20Trip%202026%20settlement/);
+  assert.match(uri, /tn=Splitzy%20Goa%20Trip%202026%20settlement/);
+});
+
+/**
+ * The bug behind "you have exceeded your payment limit" (Google Pay) and
+ * "UPI ID is invalid" (CRED) on real devices: `tr`/`mc` are merchant-flow
+ * fields, and sending `tr` without `mc` to a personal VPA yields a payload
+ * PSP apps reject behind misleading error messages.
+ */
+test("never emits the merchant-only tr or mc fields — this is a P2P payment", () => {
+  for (const app of ["generic", "gpay", "phonepe", "paytm", "cred"] as const) {
+    const uri = buildUpiPaymentUri(
+      {
+        recipientUpiId: "snehil@ybl",
+        recipientName: "Snehil",
+        amount: 3167,
+        tripName: "Dharamshala",
+      },
+      app,
+    );
+    assert.ok(!/[?&]tr=/.test(uri), `${app} URI must not contain tr: ${uri}`);
+    assert.ok(!/[?&]mc=/.test(uri), `${app} URI must not contain mc: ${uri}`);
+  }
+});
+
+test("emits exactly the five P2P fields, in NPCI's documented order", () => {
+  const uri = buildUpiPaymentUri({
+    recipientUpiId: "snehil@ybl",
+    recipientName: "Snehil",
+    amount: 250,
+    tripName: "Trip",
+  });
+  const keys = uri
+    .split("?")[1]
+    .split("&")
+    .map((pair) => pair.split("=")[0]);
+  assert.deepEqual(keys, ["pa", "pn", "am", "cu", "tn"]);
+});
+
+test("a non-ASCII trip name can never leak into the note", () => {
+  const uri = buildUpiPaymentUri({
+    recipientUpiId: "snehil@ybl",
+    recipientName: "Snehil",
+    amount: 50,
+    tripName: "गोवा · Trip™",
+  });
+  const note = decodeURIComponent(uri.split("tn=")[1].split("&")[0]);
+  assert.match(note, /^[A-Za-z0-9 ]+$/, `note must be plain ASCII, got: ${note}`);
+  assert.ok(note.length <= 40);
 });
 
 test("cu is always INR and pa carries the exact recipient UPI ID, unencoded characters intact", () => {
@@ -136,21 +179,9 @@ test("cu is always INR and pa carries the exact recipient UPI ID, unencoded char
     recipientName: "Snehil",
     amount: 50,
     tripName: "Trip",
-    reference: "ref-5",
   });
   assert.match(uri, /[?&]cu=INR(&|$)/);
   assert.match(uri, /pa=snehil\.rai%40okhdfcbank/);
-});
-
-test("the reference (tr) passed in is the one that appears in the URI, verbatim", () => {
-  const uri = buildUpiPaymentUri({
-    recipientUpiId: "snehil@ybl",
-    recipientName: "Snehil",
-    amount: 50,
-    tripName: "Trip",
-    reference: "client-generated-uuid-123",
-  });
-  assert.match(uri, /tr=client-generated-uuid-123(&|$)/);
 });
 
 test("a zero or negative amount is rejected rather than silently encoded", () => {
@@ -159,8 +190,7 @@ test("a zero or negative amount is rejected rather than silently encoded", () =>
       recipientUpiId: "snehil@ybl",
       recipientName: "Snehil",
       amount: 0,
-      tripName: "Trip",
-      reference: "ref-6",
+      tripName: "Trip"
     }),
   );
   assert.throws(() =>
@@ -168,8 +198,7 @@ test("a zero or negative amount is rejected rather than silently encoded", () =>
       recipientUpiId: "snehil@ybl",
       recipientName: "Snehil",
       amount: -5,
-      tripName: "Trip",
-      reference: "ref-7",
+      tripName: "Trip"
     }),
   );
 });
@@ -180,8 +209,7 @@ test("a malformed recipient UPI ID is rejected rather than silently encoded into
       recipientUpiId: "not-a-upi-id",
       recipientName: "Snehil",
       amount: 50,
-      tripName: "Trip",
-      reference: "ref-8",
+      tripName: "Trip"
     }),
   );
 });
@@ -191,8 +219,7 @@ test("buildUpiPaymentUri only ever reflects the exact fields it was given — th
     recipientUpiId: "trusted@ybl",
     recipientName: "Trusted Person",
     amount: 250,
-    tripName: "Trip",
-    reference: "ref-9",
+    tripName: "Trip"
   };
   const uri = buildUpiPaymentUri(input);
   // Same call, same inputs, must be byte-identical — nothing hidden mutates

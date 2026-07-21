@@ -6,10 +6,30 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { formatINR } from "@/lib/format";
 import { recordSettlement } from "@/lib/queries";
 import type { Settlement } from "@/lib/types";
-import { buildUpiPaymentUri, maskUpiId, UPI_APP_LABELS, type UpiAppId } from "@/lib/upi";
+import {
+  buildUpiPaymentUri,
+  maskUpiId,
+  UPI_APP_LABELS,
+  UPI_APP_OPEN_URIS,
+} from "@/lib/upi";
 import { CheckIcon, CopyIcon, WalletIcon, XIcon } from "./icons";
 
-const TRY_APPS: Exclude<UpiAppId, "generic">[] = ["gpay", "phonepe", "paytm", "cred"];
+/**
+ * CRED first because it is the one app confirmed on a real device to carry
+ * an externally-initiated payment all the way through to success.
+ *
+ * The others are offered but genuinely may not complete: Google Pay in
+ * particular resolves the payee (name and photo), accepts the UPI PIN, and
+ * *then* declines at the switch with a misleading "you have exceeded your
+ * payment limit" — even for ₹1, and even though paying the same person from
+ * inside Google Pay works. That is Google Pay's own policy on payments
+ * initiated from outside a UPI app to a personal VPA; the payload is
+ * identical to the one CRED accepts, so there is nothing to fix on our
+ * side. Sending these apps payment parameters therefore only walks the user
+ * to a PIN prompt that cannot succeed, so they get a plain "open the app"
+ * link and copy-then-paste is presented as the real path.
+ */
+const OPEN_ONLY_APPS = ["gpay", "phonepe", "paytm"] as const;
 
 interface UpiPaymentSheetProps {
   settlement: Settlement;
@@ -46,48 +66,25 @@ export function UpiPaymentSheet({
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
 
-  const [reference] = useState(() => crypto.randomUUID());
   const recipientUpiId = settlement.to.upiId;
 
-  const uri = useMemo(() => {
+  /** Full payment link for CRED — the one app confirmed to complete these. */
+  const credUri = useMemo(() => {
     if (!recipientUpiId) return null;
     try {
-      return buildUpiPaymentUri({
-        recipientUpiId,
-        recipientName: settlement.to.name,
-        amount: settlement.amount,
-        tripName,
-        reference,
-      });
+      return buildUpiPaymentUri(
+        {
+          recipientUpiId,
+          recipientName: settlement.to.name,
+          amount: settlement.amount,
+          tripName,
+        },
+        "cred",
+      );
     } catch {
       return null;
     }
-  }, [recipientUpiId, settlement.to.name, settlement.amount, tripName, reference]);
-
-  // Best-effort, app-specific links (see upi.ts) — not first-party verified
-  // the way the generic scheme is, so these are offered as secondary "try
-  // this app" actions, never the only way to pay.
-  const appUris = useMemo(() => {
-    if (!recipientUpiId) return {} as Record<Exclude<UpiAppId, "generic">, string>;
-    const result = {} as Record<Exclude<UpiAppId, "generic">, string>;
-    for (const app of TRY_APPS) {
-      try {
-        result[app] = buildUpiPaymentUri(
-          {
-            recipientUpiId,
-            recipientName: settlement.to.name,
-            amount: settlement.amount,
-            tripName,
-            reference,
-          },
-          app,
-        );
-      } catch {
-        // Leave this app out of the row entirely if it somehow can't be built.
-      }
-    }
-    return result;
-  }, [recipientUpiId, settlement.to.name, settlement.amount, tripName, reference]);
+  }, [recipientUpiId, settlement.to.name, settlement.amount, tripName]);
 
   async function copy(text: string, setCopied: (v: boolean) => void) {
     try {
@@ -170,8 +167,8 @@ export function UpiPaymentSheet({
           )}
 
           {phase === "launch" && (
-            <div className="space-y-4 pt-5">
-              {!recipientUpiId || !uri ? (
+            <div className="space-y-5 pt-5">
+              {!recipientUpiId || !credUri ? (
                 <p className="rounded-2xl bg-negative/10 p-4 text-center text-sm text-negative">
                   {settlement.to.name} hasn&apos;t added a UPI ID yet, so there&apos;s nothing to
                   pay to directly. Ask them to add one in Settings, or settle up another way.
@@ -184,73 +181,83 @@ export function UpiPaymentSheet({
                       copy the details below.
                     </p>
                   )}
-                  <a
-                    href={online ? uri : undefined}
-                    aria-disabled={!online}
-                    onClick={(e) => {
-                      if (!online) {
-                        e.preventDefault();
-                        return;
-                      }
-                      setPhase("confirm");
-                    }}
-                    className={`tap flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-brand to-accent text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow ${
-                      online ? "hover:shadow-xl" : "pointer-events-none opacity-50"
-                    }`}
-                  >
-                    <WalletIcon className="size-4" />
-                    Open UPI app
-                  </a>
-                  <p className="text-center text-xs text-ink-faint">
-                    Opens whichever UPI app you have installed. Splitzy can&apos;t guarantee a
-                    chooser will appear on every device.
-                  </p>
 
-                  {online && Object.keys(appUris).length > 0 && (
-                    <div>
-                      <p className="mb-2 text-center text-xs text-ink-faint">
-                        Or try a specific app directly:
-                      </p>
-                      <div className="flex flex-wrap justify-center gap-2">
-                        {TRY_APPS.filter((app) => appUris[app]).map((app) => (
-                          <a
-                            key={app}
-                            href={appUris[app]}
-                            onClick={() => setPhase("confirm")}
-                            className="tap rounded-full bg-line/60 px-3.5 py-2 text-xs font-semibold transition-colors hover:bg-line"
-                          >
-                            {UPI_APP_LABELS[app]}
-                          </a>
-                        ))}
-                      </div>
-                      <p className="mt-2 text-center text-[11px] leading-relaxed text-ink-faint">
-                        Best-effort — not every device will have every app installed, and these
-                        aren&apos;t guaranteed to work like the button above.
-                      </p>
+                  {/* Preferred path: the one app confirmed to carry an
+                      externally-started payment through to completion. */}
+                  <section>
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="rounded-full bg-positive/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-positive">
+                        Recommended
+                      </span>
+                      <span className="text-xs text-ink-muted">Amount filled in for you</span>
                     </div>
-                  )}
+                    <a
+                      href={online ? credUri : undefined}
+                      aria-disabled={!online}
+                      onClick={(e) => {
+                        if (!online) {
+                          e.preventDefault();
+                          return;
+                        }
+                        setPhase("confirm");
+                      }}
+                      className={`tap flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-brand to-accent text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-shadow ${
+                        online ? "hover:shadow-xl" : "pointer-events-none opacity-50"
+                      }`}
+                    >
+                      <WalletIcon className="size-4" />
+                      Pay {formatINR(settlement.amount)} with CRED
+                    </a>
+                  </section>
+
+                  {/* Everything else: copy first, then open the app cold. */}
+                  <section className="rounded-2xl bg-line/40 p-4">
+                    <p className="text-sm font-semibold">Using another UPI app?</p>
+                    <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                      Google Pay, PhonePe and Paytm block payments started from outside their own
+                      app — they&apos;ll take your PIN and then fail. Copy the UPI ID, open your
+                      app, and paste it there instead.
+                    </p>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => copy(recipientUpiId, setCopiedUpi)}
+                        className="tap flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-surface-strong text-sm font-semibold transition-shadow hover:shadow-md"
+                      >
+                        <CopyIcon className="size-4" />
+                        {copiedUpi ? "Copied!" : "Copy UPI ID"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copy(settlement.amount.toFixed(2), setCopiedAmount)}
+                        className="tap flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-surface-strong text-sm font-semibold transition-shadow hover:shadow-md"
+                      >
+                        <CopyIcon className="size-4" />
+                        {copiedAmount ? "Copied!" : "Copy amount"}
+                      </button>
+                    </div>
+
+                    {online && (
+                      <>
+                        <p className="mt-3.5 text-xs font-medium text-ink-muted">Then open:</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {OPEN_ONLY_APPS.map((app) => (
+                            <a
+                              key={app}
+                              href={UPI_APP_OPEN_URIS[app]}
+                              onClick={() => setPhase("confirm")}
+                              className="tap min-h-11 rounded-full bg-surface-strong px-4 py-2.5 text-xs font-semibold transition-shadow hover:shadow-md"
+                            >
+                              {UPI_APP_LABELS[app]}
+                            </a>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </section>
                 </>
               )}
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => recipientUpiId && copy(recipientUpiId, setCopiedUpi)}
-                  disabled={!recipientUpiId}
-                  className="tap flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-line/60 text-sm font-semibold transition-colors hover:bg-line disabled:opacity-50"
-                >
-                  <CopyIcon className="size-4" />
-                  {copiedUpi ? "Copied!" : "Copy UPI ID"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => copy(settlement.amount.toFixed(2), setCopiedAmount)}
-                  className="tap flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-line/60 text-sm font-semibold transition-colors hover:bg-line"
-                >
-                  <CopyIcon className="size-4" />
-                  {copiedAmount ? "Copied!" : "Copy amount"}
-                </button>
-              </div>
 
               <button
                 type="button"
