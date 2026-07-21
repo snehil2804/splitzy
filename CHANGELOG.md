@@ -1,5 +1,16 @@
 # Changelog
 
+## [Data cleanup] — production reset from test data to a clean slate (2026-07-21)
+
+Data-only cleanup, no schema/RLS/function/trigger/auth-config changes. Ran per an explicit 10-point inspect-then-approve spec: inspected schema and FK cascade behavior, reported before/after row counts, proposed exact SQL, took a full-row-content backup, then executed only after explicit approval.
+
+- **9 trips deleted** (all of them): the original `Dharamshala` trip (14 expenses, 47 expense_participants, 5 trip_members, 2 invitations, 1 settlement, 26 activity_log rows — the only real usage data in the database) plus 8 trips leaked into production by earlier live-e2e-test runs whose cleanup hadn't reached them (`E2E Trip` ×5, `E2E Invite Trip` ×3 — empty except trigger-generated activity_log rows). Cascades/explicit deletes covered every dependent row; verified zero orphans before and after.
+- **25 of 30 `members` rows deleted** — every `E2E Guest/Owner/Tester ...` row from those same leaked test runs. **5 preserved on purpose**, deliberately kept independent of the trips being wiped (matching `delete_trip()`'s own design — member identity outlives trip membership): `Snehil` (the real account), `Shruti`, `Anshul`, `Heteee`, and `Snehiltest` (detached from its auth user, see below, but the member row itself kept so a future re-invite can still link to its history).
+- **15 `auth.users` deleted**, by explicit separate approval (the default plan was to leave all of them untouched): the 14 disposable `splitzy-e2e-*`/`splitzy-inv-*@example.com` live-test accounts, plus the user's own secondary `snehilrai678.pr@gmail.com` account. `members.user_id` was set to `NULL` on `Snehiltest` first to clear the FK reference before deletion. The real login (`snehilrai678.sr@gmail.com`) and its `members`/`profiles` rows are completely untouched — confirmed via a post-cleanup query returning exactly that one row in both tables.
+- All other tables now read zero: `expenses`, `expense_participants`, `trip_members`, `invitations`, `settlements`, `activity_log`.
+- Verification: all 16 pre-existing RPCs/helper functions confirmed still present (`pg_proc` lookup by name), Supabase security advisors show only the same pre-existing by-design `SECURITY DEFINER` warnings (nothing new introduced), lint/`tsc --noEmit`/74-74 unit tests/production build all clean afterward (unaffected by a data-only change, as expected). Live e2e suites were deliberately **not** re-run immediately after, since they'd reintroduce test data into the now-clean database.
+- Backup: full JSON row dump of every deleted row, taken immediately before the transaction, kept locally (not committed) for manual reconstruction if ever needed.
+
 ## [Offline perf] — Supabase SDK removed from the offline critical path (`main` @ `8f24cfc`)
 
 `/offline` went from **1009 kB across 14 assets to 730 kB across 12** (−280 kB, −28%), with the auth SDK verified absent from every chunk it loads — checked against the deployed production site, not only locally. `/login` still carries it, as it must. The SDK was there purely so `useSession()` could call `getSession()`, which offline cannot succeed at anyway: with the radios off its token refresh never settles, which is what originally hung the screen on "Loading…".

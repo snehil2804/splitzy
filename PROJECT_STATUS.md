@@ -1,6 +1,27 @@
 # Project Status
 
-_Last updated: 2026-07-21 (Offline Expense Queue — merged and live in production)_
+_Last updated: 2026-07-21 (production database reset from test data to a clean slate)_
+
+## ✅ Production data reset — DONE
+
+The database now holds exactly one real member (`Snehil`, linked to `snehilrai678.sr@gmail.com`) plus 4 preserved-for-reuse guest identities (`Shruti`, `Anshul`, `Heteee`, `Snehiltest`) and zero trips/expenses/settlements/invitations/activity — a clean slate for real usage. Full detail in CHANGELOG "[Data cleanup]". Schema, RLS, functions, triggers, and auth configuration are all untouched; the real login was verified to still be the sole row in both `auth.users` and its linked `members`/`profiles` rows after cleanup.
+
+**Before → after row counts:**
+
+| Table | Before | After |
+|---|---|---|
+| `trips` | 9 | 0 |
+| `expenses` | 14 | 0 |
+| `expense_participants` | 47 | 0 |
+| `trip_members` | 5 | 0 |
+| `invitations` | 2 | 0 |
+| `settlements` | 1 | 0 |
+| `activity_log` | 62 | 0 |
+| `members` | 30 | 5 |
+| `profiles` | 16 | 1 |
+| `auth.users` | 16 | 1 |
+
+**Verification after cleanup**: all 16 RPCs/helper functions still present; security advisors unchanged (only pre-existing by-design warnings); `lint`/`tsc --noEmit`/74-74 unit tests/production build all clean. **Not yet done**: a live UI walkthrough (sign in, confirm Trips/Expenses/Balances show empty states, create a new trip, invite a member, add/edit/delete an expense) — recommended as the next manual check now that real usage is starting.
 
 ## ✅ Offline Expense Queue — MERGED AND LIVE
 
