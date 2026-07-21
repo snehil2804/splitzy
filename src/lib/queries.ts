@@ -163,6 +163,7 @@ export async function fetchTripData(
       name: tm.members!.name,
       userId: tm.members!.user_id,
       role: tm.role,
+      upiId: tm.members!.upi_id,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -529,6 +530,45 @@ export async function updateDisplayName(displayName: string): Promise<void> {
     .from("profiles")
     .update({ display_name: displayName })
     .eq("id", userId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * The signed-in user's own UPI ID, read directly off their linked `members`
+ * row (`upi_id` lives on `members`, not `profiles` — see `upi.ts`). Null if
+ * they have no linked member identity yet, or haven't set one.
+ */
+export async function fetchMyUpiId(): Promise<string | null> {
+  const supabase = getSupabase();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  if (!userId) return null;
+  const { data, error } = await supabase
+    .from("members")
+    .select("upi_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as { upi_id: string | null } | null)?.upi_id ?? null;
+}
+
+/**
+ * Self-service only: RLS scopes this update to the caller's own `members`
+ * row (`user_id = auth.uid()`), and the column-level grant on `members`
+ * covers only `upi_id` — no other member field is reachable through this
+ * call. `null`/empty clears it. The server's CHECK constraint is the real
+ * format boundary; this just surfaces its error message.
+ */
+export async function updateMyUpiId(upiId: string | null): Promise<void> {
+  const supabase = getSupabase();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  if (!userId) throw new Error("Not signed in.");
+  const normalized = upiId?.trim() || null;
+  const { error } = await supabase
+    .from("members")
+    .update({ upi_id: normalized })
+    .eq("user_id", userId);
   if (error) throw new Error(error.message);
 }
 

@@ -520,7 +520,9 @@ export default function TripsPage() {
                 >
                   <Avatar name={m.name} size="sm" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
+                    {/* Not truncated — a member roster exists to show who's
+                        in the trip, so a long name must stay fully readable. */}
+                    <span className="block text-sm font-medium leading-snug">
                       {m.name}
                       {m.id === data.myMemberId && (
                         <span className="text-ink-muted"> (you)</span>

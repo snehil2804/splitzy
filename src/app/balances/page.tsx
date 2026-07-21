@@ -6,6 +6,7 @@ import { InfoIcon } from "@/components/icons";
 import { SettlementList } from "@/components/SettlementList";
 import { CardSkeleton } from "@/components/Skeleton";
 import { AccessDeniedState, EmptyState, ErrorState, SetupNotice } from "@/components/StateViews";
+import { UpiPaymentSheet } from "@/components/UpiPaymentSheet";
 import { useTripData } from "@/hooks/useTripData";
 import { computeBalances, computeSettlements, totalYouAreOwed, totalYouOwe } from "@/lib/balances";
 import { formatINR } from "@/lib/format";
@@ -19,6 +20,7 @@ export default function BalancesPage() {
 
   const [settlingKey, setSettlingKey] = useState<string | null>(null);
   const [settleError, setSettleError] = useState<string | null>(null);
+  const [payingSettlement, setPayingSettlement] = useState<Settlement | null>(null);
 
   const derived = useMemo(() => {
     if (!data) return null;
@@ -43,6 +45,30 @@ export default function BalancesPage() {
     } finally {
       setSettlingKey(null);
     }
+  }
+
+  /**
+   * Reloads trip data before opening the Pay sheet, so the amount and
+   * recipient it shows are the authoritative latest values from the
+   * server, not a possibly-stale in-memory snapshot — if this exact
+   * from/to pair is no longer outstanding (e.g. someone else just recorded
+   * it), the sheet never opens.
+   */
+  async function handleOpenPay(s: Settlement) {
+    setSettleError(null);
+    const fresh = await refresh();
+    if (!fresh) return;
+    const freshSettlements = computeSettlements(
+      computeBalances(fresh.members, fresh.expenses, fresh.settlements),
+    );
+    const stillOutstanding = freshSettlements.find(
+      (candidate) => candidate.from.id === s.from.id && candidate.to.id === s.to.id,
+    );
+    if (!stillOutstanding) {
+      setSettleError("This settlement has already been resolved.");
+      return;
+    }
+    setPayingSettlement(stillOutstanding);
   }
 
   return (
@@ -190,6 +216,7 @@ export default function BalancesPage() {
                   identity={myName}
                   onSettle={handleSettle}
                   settlingKey={settlingKey}
+                  onPay={handleOpenPay}
                 />
                 {settleError && (
                   <p className="anim-fade-in mt-3 rounded-2xl bg-negative/10 p-3 text-center text-sm font-medium text-negative">
@@ -200,6 +227,18 @@ export default function BalancesPage() {
             </>
           )}
         </>
+      )}
+
+      {payingSettlement && data?.trip && (
+        <UpiPaymentSheet
+          settlement={payingSettlement}
+          tripId={data.trip.id}
+          tripName={data.trip.name}
+          onClose={() => setPayingSettlement(null)}
+          onSettled={() => {
+            void refresh();
+          }}
+        />
       )}
     </div>
   );

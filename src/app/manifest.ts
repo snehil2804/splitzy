@@ -4,7 +4,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Splitzy",
     short_name: "Splitzy",
-    description: "Trip expenses for Snehil, Shruti & Anshul — split, sorted.",
+    description:
+      "Split trip expenses with friends — track who paid, see who owes what, and settle up over UPI.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",

@@ -14,6 +14,8 @@ export interface MemberRow {
   /** Linked auth user; null = guest member (no login). */
   user_id: string | null;
   created_at: string;
+  /** Self-reported UPI payment handle, e.g. "name@bank". Null if never set. */
+  upi_id: string | null;
 }
 
 export interface TripRow {
@@ -127,6 +129,12 @@ export interface Member {
   /** Null for guest members (no login). */
   userId: string | null;
   role: "owner" | "member";
+  /**
+   * Self-reported UPI payment handle. Saving this does not verify bank
+   * ownership — see the "About UPI IDs" copy on the profile page. Null if
+   * this member has never set one.
+   */
+  upiId: string | null;
 }
 
 export interface Trip {

@@ -3,9 +3,9 @@ import { test } from "node:test";
 import { computeBalances, computeSettlements, totalSpent } from "../src/lib/balances";
 import type { Expense, Member, MemberBalance, SettlementRecord } from "../src/lib/types";
 
-const snehil: Member = { id: "m1", name: "Snehil", userId: "u1", role: "owner" };
-const shruti: Member = { id: "m2", name: "Shruti", userId: null, role: "member" };
-const anshul: Member = { id: "m3", name: "Anshul", userId: null, role: "member" };
+const snehil: Member = { id: "m1", name: "Snehil", userId: "u1", role: "owner", upiId: null };
+const shruti: Member = { id: "m2", name: "Shruti", userId: null, role: "member", upiId: null };
+const anshul: Member = { id: "m3", name: "Anshul", userId: null, role: "member", upiId: null };
 const members = [snehil, shruti, anshul];
 
 function expense(overrides: Partial<Expense>): Expense {
@@ -104,11 +104,11 @@ test("settlements: a recorded payment reduces both parties' net balance", () => 
 });
 
 test("settlement optimization: independent zero-sum groups beat naive full-set greedy", () => {
-  const a: Member = { id: "a", name: "A", userId: null, role: "member" };
-  const b: Member = { id: "b", name: "B", userId: null, role: "member" };
-  const c: Member = { id: "c", name: "C", userId: null, role: "member" };
-  const d: Member = { id: "d", name: "D", userId: null, role: "member" };
-  const e: Member = { id: "e", name: "E", userId: null, role: "member" };
+  const a: Member = { id: "a", name: "A", userId: null, role: "member", upiId: null };
+  const b: Member = { id: "b", name: "B", userId: null, role: "member", upiId: null };
+  const c: Member = { id: "c", name: "C", userId: null, role: "member", upiId: null };
+  const d: Member = { id: "d", name: "D", userId: null, role: "member", upiId: null };
+  const e: Member = { id: "e", name: "E", userId: null, role: "member", upiId: null };
   // Scaled well beyond SETTLED_EPSILON (₹1) so no accidental near-zero
   // subset gets treated as settled by the epsilon tolerance.
   const balances: MemberBalance[] = [

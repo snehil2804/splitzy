@@ -16,12 +16,22 @@ export const metadata: Metadata = {
     default: "Splitzy",
     template: "%s · Splitzy",
   },
-  description: "Trip expenses for Snehil, Shruti & Anshul — split, sorted.",
+  description:
+    "Split trip expenses with friends — track who paid, see who owes what, and settle up over UPI.",
   applicationName: "Splitzy",
+  authors: [{ name: "Snehil Rai" }],
+  creator: "Snehil Rai",
   appleWebApp: {
     capable: true,
     title: "Splitzy",
     statusBarStyle: "black-translucent",
+  },
+  openGraph: {
+    title: "Splitzy",
+    description:
+      "Split trip expenses with friends — track who paid, see who owes what, and settle up over UPI.",
+    siteName: "Splitzy",
+    type: "website",
   },
 };
 

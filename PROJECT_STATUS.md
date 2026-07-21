@@ -1,6 +1,18 @@
 # Project Status
 
-_Last updated: 2026-07-21 (production database reset from test data to a clean slate)_
+_Last updated: 2026-07-21 (settlement UPI payments — merged and live)_
+
+## ✅ Settlement UPI payments — MERGED AND LIVE
+
+Fixes the settlement-row mobile layout and adds a "Pay via UPI" flow — see CHANGELOG "[Settlement UPI payments]" for the full change list. Two additive migrations applied to production: `20260722000000_member_upi_id.sql` (`members.upi_id`, format CHECK, column-scoped self-service grant + RLS policy mirroring `profiles.display_name`) and `20260722010000_fix_member_upi_id_regex_limit.sql` (the `{2,256}` → `{2,100}` regex-limit fix). Settlement math/`record_settlement()`/balance calculations untouched.
+
+**Verification**: `lint`/`tsc --noEmit`/91-91 unit tests (was 74, +17 new UPI cases)/production build all clean; offline-bundle regression re-run (`/offline` still 730 KB/12 assets, `GoTrueClient` still absent); the stale three-friend branding confirmed gone from the built HTML and manifest. The real verification was the user's own physical-iPhone testing across four Preview rounds, which caught two things nothing local would have: the regex-limit bug (every UPI save failing) and the iOS single-app deep-link behavior.
+
+**Two lessons worth keeping**:
+1. **Verifying a constraint exists is not verifying it works.** The `{2,256}` regex bug passed a "does the constraint exist / does the pattern match in JS" check and still failed every real write, because PostgreSQL's regex engine caps bounded repetition at 255 and JS doesn't. Always push a real value through a new constraint before calling it verified.
+2. **iOS has no chooser for custom URL schemes.** When several apps register `upi://`, Apple's docs say the chosen app "is undefined" — so a generic UPI link silently opens one arbitrary app forever. Targeting a specific app reliably needs that provider's merchant registration; the best-effort branded schemes shipped here are labeled as such and never the only path.
+
+**Interactive browser verification was again unavailable** (Chrome extension unresponsive across several attempts this session), so layout changes were verified by build/tests/measurement plus static markup reproductions sent to the user — the physical-device pass remains the real check.
 
 ## ✅ Production data reset — DONE
 

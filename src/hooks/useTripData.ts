@@ -91,7 +91,17 @@ export function useTripData() {
     void load();
   }, [selectedTripId]);
 
-  const refresh = useCallback(() => load(true), []);
+  /**
+   * Returns the freshly-loaded data directly (not just triggering a
+   * re-render) — callers that need the authoritative latest value
+   * synchronously after awaiting this (e.g. re-checking a settlement is
+   * still outstanding right before opening a payment sheet) don't have to
+   * wait on React's own re-render timing to see it.
+   */
+  const refresh = useCallback(async () => {
+    await load(true);
+    return state.data;
+  }, []);
 
   /**
    * Optimistically removes the expense, then persists the soft delete.
