@@ -6,8 +6,10 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { formatINR } from "@/lib/format";
 import { recordSettlement } from "@/lib/queries";
 import type { Settlement } from "@/lib/types";
-import { buildUpiPaymentUri, maskUpiId } from "@/lib/upi";
+import { buildUpiPaymentUri, maskUpiId, UPI_APP_LABELS, type UpiAppId } from "@/lib/upi";
 import { CheckIcon, CopyIcon, WalletIcon, XIcon } from "./icons";
+
+const TRY_APPS: Exclude<UpiAppId, "generic">[] = ["gpay", "phonepe", "paytm", "cred"];
 
 interface UpiPaymentSheetProps {
   settlement: Settlement;
@@ -60,6 +62,31 @@ export function UpiPaymentSheet({
     } catch {
       return null;
     }
+  }, [recipientUpiId, settlement.to.name, settlement.amount, tripName, reference]);
+
+  // Best-effort, app-specific links (see upi.ts) — not first-party verified
+  // the way the generic scheme is, so these are offered as secondary "try
+  // this app" actions, never the only way to pay.
+  const appUris = useMemo(() => {
+    if (!recipientUpiId) return {} as Record<Exclude<UpiAppId, "generic">, string>;
+    const result = {} as Record<Exclude<UpiAppId, "generic">, string>;
+    for (const app of TRY_APPS) {
+      try {
+        result[app] = buildUpiPaymentUri(
+          {
+            recipientUpiId,
+            recipientName: settlement.to.name,
+            amount: settlement.amount,
+            tripName,
+            reference,
+          },
+          app,
+        );
+      } catch {
+        // Leave this app out of the row entirely if it somehow can't be built.
+      }
+    }
+    return result;
   }, [recipientUpiId, settlement.to.name, settlement.amount, tripName, reference]);
 
   async function copy(text: string, setCopied: (v: boolean) => void) {
@@ -178,6 +205,30 @@ export function UpiPaymentSheet({
                     Opens whichever UPI app you have installed. Splitzy can&apos;t guarantee a
                     chooser will appear on every device.
                   </p>
+
+                  {online && Object.keys(appUris).length > 0 && (
+                    <div>
+                      <p className="mb-2 text-center text-xs text-ink-faint">
+                        Or try a specific app directly:
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {TRY_APPS.filter((app) => appUris[app]).map((app) => (
+                          <a
+                            key={app}
+                            href={appUris[app]}
+                            onClick={() => setPhase("confirm")}
+                            className="tap rounded-full bg-line/60 px-3.5 py-2 text-xs font-semibold transition-colors hover:bg-line"
+                          >
+                            {UPI_APP_LABELS[app]}
+                          </a>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-center text-[11px] leading-relaxed text-ink-faint">
+                        Best-effort — not every device will have every app installed, and these
+                        aren&apos;t guaranteed to work like the button above.
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
 

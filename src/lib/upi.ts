@@ -71,20 +71,44 @@ export interface UpiPaymentUriInput {
 }
 
 /**
- * Builds a standard `upi://pay` deep link (the universal NPCI scheme every
- * UPI app registers for, including Google Pay — see CLAUDE.md/plan notes on
- * why this app does not use a branded `gpay://` merchant scheme). Every
- * value is taken only from the fields on this object and run through
- * `encodeURIComponent` — there is no merge/override path, so a caller
- * cannot smuggle in a different recipient or amount than what was passed.
+ * "generic" is the universal NPCI `upi://pay` scheme every UPI app on the
+ * device registers for — the reliable default. The rest are best-effort,
+ * commonly-used branded schemes for launching one *specific* app directly,
+ * NOT confirmed against first-party documentation the way the generic
+ * scheme and Google's own merchant-flow docs were (see the plan notes /
+ * CHANGELOG entry on why a `gpay://` merchant link isn't used here — this
+ * omits `mc` entirely, since Splitzy has no merchant registration to put
+ * there). They may not work on every device; callers must always offer the
+ * generic link and Copy actions alongside them, never only these.
  */
-export function buildUpiPaymentUri({
-  recipientUpiId,
-  recipientName,
-  amount,
-  tripName,
-  reference,
-}: UpiPaymentUriInput): string {
+export type UpiAppId = "generic" | "gpay" | "phonepe" | "paytm" | "cred";
+
+const UPI_APP_SCHEMES: Record<UpiAppId, string> = {
+  generic: "upi://pay",
+  gpay: "gpay://upi/pay",
+  phonepe: "phonepe://pay",
+  paytm: "paytmmp://pay",
+  cred: "credpay://upi/pay",
+};
+
+export const UPI_APP_LABELS: Record<Exclude<UpiAppId, "generic">, string> = {
+  gpay: "Google Pay",
+  phonepe: "PhonePe",
+  paytm: "Paytm",
+  cred: "CRED",
+};
+
+/**
+ * Builds a UPI payment deep link for the given app (default: the universal
+ * scheme). Every value is taken only from the fields on this object and run
+ * through `encodeURIComponent` — there is no merge/override path, so a
+ * caller cannot smuggle in a different recipient or amount than what was
+ * passed, regardless of which app's scheme is requested.
+ */
+export function buildUpiPaymentUri(
+  { recipientUpiId, recipientName, amount, tripName, reference }: UpiPaymentUriInput,
+  app: UpiAppId = "generic",
+): string {
   if (!(amount > 0)) {
     throw new Error("Amount must be greater than zero.");
   }
@@ -107,5 +131,5 @@ export function buildUpiPaymentUri({
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join("&");
 
-  return `upi://pay?${query}`;
+  return `${UPI_APP_SCHEMES[app]}?${query}`;
 }

@@ -2,6 +2,57 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildUpiPaymentUri, maskUpiId, validateUpiId } from "../src/lib/upi";
 
+test("default (no app argument) still produces the universal upi://pay scheme, unchanged", () => {
+  const uri = buildUpiPaymentUri({
+    recipientUpiId: "snehil@ybl",
+    recipientName: "Snehil",
+    amount: 100,
+    tripName: "Trip",
+    reference: "ref-generic",
+  });
+  assert.match(uri, /^upi:\/\/pay\?/);
+});
+
+test("each app-specific scheme carries the exact same params as the generic one, just a different prefix", () => {
+  const input = {
+    recipientUpiId: "snehil@ybl",
+    recipientName: "Snehil",
+    amount: 3167,
+    tripName: "Dharamshala",
+    reference: "ref-apps",
+  };
+  const generic = buildUpiPaymentUri(input, "generic");
+  const genericQuery = generic.split("?")[1];
+
+  for (const [app, prefix] of [
+    ["gpay", "gpay://upi/pay?"],
+    ["phonepe", "phonepe://pay?"],
+    ["paytm", "paytmmp://pay?"],
+    ["cred", "credpay://upi/pay?"],
+  ] as const) {
+    const uri = buildUpiPaymentUri(input, app);
+    assert.ok(uri.startsWith(prefix), `expected ${app} URI to start with ${prefix}, got ${uri}`);
+    assert.equal(uri.slice(prefix.length), genericQuery, `${app} params should match the generic scheme's params exactly`);
+  }
+});
+
+test("an invalid recipient or non-positive amount is rejected the same way regardless of which app scheme is requested", () => {
+  for (const app of ["generic", "gpay", "phonepe", "paytm", "cred"] as const) {
+    assert.throws(() =>
+      buildUpiPaymentUri(
+        { recipientUpiId: "not-valid", recipientName: "X", amount: 10, tripName: "T", reference: "r" },
+        app,
+      ),
+    );
+    assert.throws(() =>
+      buildUpiPaymentUri(
+        { recipientUpiId: "x@ybl", recipientName: "X", amount: 0, tripName: "T", reference: "r" },
+        app,
+      ),
+    );
+  }
+});
+
 test("a well-formed UPI ID passes validation, trimmed but otherwise untouched", () => {
   const result = validateUpiId("  Snehil.Rai_92@ybl  ");
   assert.equal(result.valid, true);
