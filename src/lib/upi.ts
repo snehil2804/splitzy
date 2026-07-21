@@ -66,8 +66,23 @@ export interface UpiPaymentUriInput {
   /** A positive amount in rupees; formatted to exactly 2 decimals for `am`. */
   amount: number;
   tripName: string;
-  /** Client-generated unique reference for this payment attempt (`tr`). */
-  reference: string;
+}
+
+/**
+ * `tn` (transaction note) is passed straight through to the payer's bank and
+ * the PSP app, and those validators are far stricter than the URI encoding
+ * suggests — non-ASCII characters in particular are a common cause of
+ * rejected payloads. Reduced to plain ASCII letters, digits and spaces, and
+ * capped well under the ~50-character limit PSPs commonly enforce.
+ */
+function sanitizeNote(raw: string): string {
+  return raw
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40)
+    .trim();
 }
 
 /**
@@ -104,9 +119,19 @@ export const UPI_APP_LABELS: Record<Exclude<UpiAppId, "generic">, string> = {
  * through `encodeURIComponent` — there is no merge/override path, so a
  * caller cannot smuggle in a different recipient or amount than what was
  * passed, regardless of which app's scheme is requested.
+ *
+ * Deliberately emits ONLY the five person-to-person fields: `pa`, `pn`,
+ * `am`, `cu`, `tn`. It must never send `tr` (transaction reference) or `mc`
+ * (merchant code) — NPCI mandates those together for *merchant* (P2M)
+ * transactions, and sending `tr` without `mc` while paying a personal VPA
+ * produces a payload PSP apps reject inconsistently: Google Pay reports
+ * "you have exceeded your payment limit" (its generic invalid-payload
+ * fallback, which is why it fired even for ₹1) and CRED reports "UPI ID is
+ * invalid". Both were misleading — the UPI ID and the limit were always
+ * fine; the payload wasn't.
  */
 export function buildUpiPaymentUri(
-  { recipientUpiId, recipientName, amount, tripName, reference }: UpiPaymentUriInput,
+  { recipientUpiId, recipientName, amount, tripName }: UpiPaymentUriInput,
   app: UpiAppId = "generic",
 ): string {
   if (!(amount > 0)) {
@@ -116,14 +141,13 @@ export function buildUpiPaymentUri(
     throw new Error("Recipient does not have a valid UPI ID.");
   }
 
-  const note = `Splitzy · ${tripName} settlement`;
+  const note = sanitizeNote(`Splitzy ${tripName} settlement`);
   const params: [string, string][] = [
     ["pa", recipientUpiId],
-    ["pn", recipientName],
+    ["pn", sanitizeNote(recipientName) || "Splitzy payee"],
     ["am", amount.toFixed(2)],
     ["cu", "INR"],
     ["tn", note],
-    ["tr", reference],
   ];
   // Encoded by hand (not URLSearchParams) so spaces become %20, not "+" —
   // the more universally compatible form across UPI apps' query parsing.

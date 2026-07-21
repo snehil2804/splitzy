@@ -46,7 +46,6 @@ export function UpiPaymentSheet({
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
 
-  const [reference] = useState(() => crypto.randomUUID());
   const recipientUpiId = settlement.to.upiId;
 
   const uri = useMemo(() => {
@@ -57,12 +56,11 @@ export function UpiPaymentSheet({
         recipientName: settlement.to.name,
         amount: settlement.amount,
         tripName,
-        reference,
       });
     } catch {
       return null;
     }
-  }, [recipientUpiId, settlement.to.name, settlement.amount, tripName, reference]);
+  }, [recipientUpiId, settlement.to.name, settlement.amount, tripName]);
 
   // Best-effort, app-specific links (see upi.ts) — not first-party verified
   // the way the generic scheme is, so these are offered as secondary "try
@@ -78,7 +76,6 @@ export function UpiPaymentSheet({
             recipientName: settlement.to.name,
             amount: settlement.amount,
             tripName,
-            reference,
           },
           app,
         );
@@ -87,7 +84,7 @@ export function UpiPaymentSheet({
       }
     }
     return result;
-  }, [recipientUpiId, settlement.to.name, settlement.amount, tripName, reference]);
+  }, [recipientUpiId, settlement.to.name, settlement.amount, tripName]);
 
   async function copy(text: string, setCopied: (v: boolean) => void) {
     try {
