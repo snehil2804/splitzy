@@ -1,5 +1,17 @@
 # Changelog
 
+## [UPI payments] — make payments actually complete (2026-07-21)
+
+Real payments failed on-device even though the sheet worked: Google Pay resolved the payee (name *and* profile photo), accepted the UPI PIN, then declined with "you have exceeded your payment limit" — for ₹1 — while paying the same person from inside Google Pay worked fine. CRED said "UPI ID cannot be verified". Two separate causes, found in order.
+
+- **Cause 1, ours: the link carried `tr` (transaction reference).** Per NPCI, `tr` and `mc` (merchant code) are the merchant-flow (P2M) fields and are mandated *together*; sending `tr` without `mc` while paying a **personal** VPA produces a payload PSP apps reject and then report behind whatever generic error they happen to use ("limit exceeded" is a documented fallback for an unparseable payload, which is why the amount was irrelevant). Now emits exactly the five P2P fields — `pa`, `pn`, `am`, `cu`, `tn` — and nothing else. Also sanitised `tn`/`pn` to plain ASCII capped at 40 chars; the note previously contained a non-ASCII middle dot, an independent rejection risk since PSP note validators are stricter than URI encoding implies. **This fix was real** — CRED went from failing to completing payments end to end.
+- **Cause 2, not ours: Google Pay declines externally-initiated payments to a personal VPA.** With the corrected payload CRED completes; Google Pay still fails *after* PIN entry. Identical link, opposite outcomes, so the payload is valid and this is Google Pay's own policy. No parameter change fixes it.
+- **The sheet was restructured around that reality** rather than pretending every app works. CRED leads as the recommended path with the amount pre-filled. Google Pay / PhonePe / Paytm now get a **bare app-launch link carrying no payment parameters at all** — sending them a full link was worse than sending nothing, because it walked the user to a UPI PIN prompt for a payment that could never succeed. Copy UPI ID / Copy amount are promoted into that section as the actual mechanism, with copy explaining why the details must be pasted in by hand.
+
+**How this was diagnosed, since two confident guesses in a row missed**: a temporary `/upi-debug` page (since removed) that walked the payload down from the full link to a bare `pa`-only link, per app, on a real device. Storage was ruled out first by dumping `octet_length` + hex of the stored values in Postgres — both were byte-perfect ASCII. The decisive datapoint was CRED succeeding on the exact payload Google Pay rejects.
+
+**Tooling note**: the Chrome extension was unresponsive for this entire session, so headless Chromium (Playwright, installed outside the repo) was used to measure layout directly — confirming the app shell has zero overflow at 375×812, which ruled the shell out of a reported phantom-scroll issue instead of guessing at a CSS fix.
+
 ## [Settlement UPI payments] — mobile row fix + Pay via UPI
 
 Built on `feature/settlement-upi-payments` and merged only after the user verified the flow on a physical iPhone across several Preview rounds.

@@ -1,6 +1,20 @@
 # Project Status
 
-_Last updated: 2026-07-21 (settlement UPI payments — merged and live)_
+_Last updated: 2026-07-21 (UPI payments completing on-device — merged and live)_
+
+## ✅ UPI payments now complete on a real device — MERGED AND LIVE
+
+Follow-up to the feature below, after real payments failed on-device. Two distinct causes, see CHANGELOG "[UPI payments]" for the full account:
+
+1. **Ours**: the link carried `tr` without `mc` — merchant-flow fields sent on a payment to a personal VPA. Fixed; the payload is now exactly NPCI's five P2P fields (`pa`, `pn`, `am`, `cu`, `tn`), ASCII-sanitised. This took CRED from failing to completing payments.
+2. **Not ours**: Google Pay declines externally-initiated payments to a personal VPA — it resolves the payee, takes the UPI PIN, then fails at the switch with a bogus "limit exceeded". Identical payload succeeds in CRED, so nothing on our side fixes it.
+
+The sheet now reflects that: CRED leads with the amount pre-filled; Google Pay / PhonePe / Paytm get a bare app-launch link with **no** payment parameters (sending them a full link only walked users to a doomed PIN prompt), with Copy UPI ID / Copy amount promoted as the real mechanism.
+
+**Three process lessons from this stretch, all earned the hard way:**
+1. **Two confident diagnoses in a row were wrong.** Both were real bugs, neither was the whole cause. The thing that actually resolved it was a throwaway `/upi-debug` page that walked the payload down field by field, per app, on the real device — that should have come *before* the second guess, not after.
+2. **Verify at the layer you're claiming.** The `{2,256}` regex bug passed "does the constraint exist" and "does the JS regex match" and still failed every write, because Postgres caps `{n,m}` at 255 and JS doesn't. Push a real value through.
+3. **Measure instead of guessing at UI.** With the Chrome extension down all session, headless Chromium (Playwright, installed outside the repo) measured the shell at 375×812 and found zero overflow — which honestly ruled it out of a reported scroll issue rather than shipping a speculative CSS change.
 
 ## ✅ Settlement UPI payments — MERGED AND LIVE
 
