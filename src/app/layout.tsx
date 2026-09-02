@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { OfflineRedirector } from "@/components/OfflineRedirector";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import { ShellGate } from "@/components/ShellGate";
@@ -83,6 +84,7 @@ export default function RootLayout({
           </main>
         </div>
         <TabBar />
+        <Analytics />
       </body>
     </html>
   );
