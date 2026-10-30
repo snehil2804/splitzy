@@ -1,3 +1,5 @@
+Link to access: https://splitzy-delta.vercel.app/login
+
 # Splitzy 💸
 
 A premium, mobile-first trip expense tracker — authenticated, multi-trip, and built to split fairly no matter how a group divides costs (equal, exact amounts, percentages, or shares).
